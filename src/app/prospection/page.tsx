@@ -59,7 +59,7 @@ export default async function ProspectionPage() {
       ) : (
         <Prospection
           pipelineName={pipeline.name}
-          currentUser={{ id: me.id, name: me.name }}
+          currentUser={{ id: me.id, name: me.name, role: me.role }}
           initialGroups={groupDTOs}
           initialStages={pipeline.stages.map<StageDTO>((s) => ({
             id: s.id,

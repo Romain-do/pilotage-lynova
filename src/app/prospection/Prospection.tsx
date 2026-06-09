@@ -16,6 +16,7 @@ import {
   updateGroup,
   deleteGroup,
   assignGroup,
+  deleteProspect,
 } from "./actions";
 import { ProspectDrawer } from "./ProspectDrawer";
 import { ListView } from "./ListView";
@@ -119,6 +120,15 @@ export function Prospection({
     });
   }
 
+  function handleChangeStage(id: string, toStageId: string) {
+    handleMove(id, toStageId, null);
+  }
+  function handleDeleteProspect(id: string) {
+    setStages((prev) => prev.map((s) => ({ ...s, prospects: s.prospects.filter((p) => p.id !== id) })));
+    if (selectedId === id) setSelectedId(null);
+    startTx(() => void deleteProspect(id));
+  }
+
   // ── Mutations groupes ──
 
   async function handleAssignGroup(ids: string[], groupId: string | null) {
@@ -198,9 +208,13 @@ export function Prospection({
           rows={rows}
           stages={stageList}
           groups={groups}
+          currentUser={currentUser}
           onOpen={setSelectedId}
           onAssignGroup={handleAssignGroup}
           onManageGroups={() => setManagerOpen(true)}
+          onChangeStage={handleChangeStage}
+          onSetReminder={handleReschedule}
+          onDeleteProspect={handleDeleteProspect}
         />
       )}
       {view === "agenda" && (

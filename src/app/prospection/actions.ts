@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requireDirigeant } from "@/lib/auth";
 import type { ProspectDTO, CommentDTO, GroupDTO } from "@/lib/prospection";
 import { mapProspect, mapComment } from "@/lib/prospection-map";
 
@@ -173,6 +173,17 @@ export async function setReminder(
 export async function archiveProspect(prospectId: string): Promise<void> {
   await requireUser();
   await prisma.prospect.update({ where: { id: prospectId }, data: { archived: true } });
+  revalidatePath("/prospection");
+}
+
+/**
+ * SUPPRESSION DÉFINITIVE d'un prospect (+ ses commentaires en cascade).
+ * RÉSERVÉE AU DIRIGEANT — garde CÔTÉ SERVEUR (§3). Le COMMERCIAL est rejeté
+ * même s'il appelle l'action directement (POST direct).
+ */
+export async function deleteProspect(prospectId: string): Promise<void> {
+  await requireDirigeant();
+  await prisma.prospect.delete({ where: { id: prospectId } }); // commentaires supprimés en cascade
   revalidatePath("/prospection");
 }
 

@@ -35,6 +35,7 @@ export interface StageDTO {
 export interface CurrentUserDTO {
   id: string;
   name: string | null;
+  role: string; // "DIRIGEANT" | "COMMERCIAL"
 }
 
 export interface GroupDTO {
@@ -182,6 +183,28 @@ export function groupColor(key: string | null): GroupColor {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   return Object.values(GROUP_PALETTE)[h % GROUP_COLOR_KEYS.length];
+}
+
+/** Pastille de couleur d'un statut (température), pour les menus de changement de statut. */
+export function temperatureDotClass(kind: string | null): string {
+  switch (kind) {
+    case "cold":
+      return "bg-sky-400";
+    case "warm":
+      return "bg-amber-400";
+    case "hot":
+      return "bg-orange-400";
+    case "meet":
+      return "bg-cyan";
+    case "won":
+      return "bg-emerald-400";
+    case "to_install":
+      return "bg-sky-500";
+    case "lost":
+      return "bg-navy/40";
+    default:
+      return "bg-navy/30";
+  }
 }
 
 /** Couleur de la pastille de rappel selon l'urgence. */
