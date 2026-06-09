@@ -13,7 +13,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "seed:users": "tsx scripts/seed-users.ts",
-    "seed:prospection": "tsx scripts/seed-prospection.ts"
+    "seed:prospection": "tsx scripts/seed-prospection.ts",
+    "import:trello": "tsx scripts/import-trello.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
