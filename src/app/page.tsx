@@ -67,7 +67,7 @@ export default async function Home() {
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {["Cockpit", "Trésorerie", "Facturation", "Prospection"].map((v) => (
+          {["Cockpit", "Trésorerie", "Facturation"].map((v) => (
             <div
               key={v}
               className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm"
@@ -76,6 +76,13 @@ export default async function Home() {
               <p className="mt-1 text-sm text-navy/50">À venir</p>
             </div>
           ))}
+          <Link
+            href="/prospection"
+            className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
+          >
+            <p className="font-medium text-navy">Prospection</p>
+            <p className="mt-1 text-sm text-cyan-600">Ouvrir le pipeline →</p>
+          </Link>
         </div>
       </section>
     </main>
