@@ -1,0 +1,50 @@
+// Schéma Prisma — Cockpit Lynova
+// Source de vérité métier (prospection) + cache des snapshots financiers.
+// Étape 1 : socle minimal (utilisateurs + rôles). Les modèles prospection (§6)
+// et finance (§4.4 / §5) seront ajoutés aux étapes 4 à 6.
+//
+// La DB est Postgres (Supabase). L'app utilise la connexion « poolée » (DATABASE_URL,
+// PgBouncer port 6543) ; les migrations utilisent la connexion directe (DIRECT_URL, 5432).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Rôles applicatifs (RBAC §3). Cloisonnement vérifié CÔTÉ SERVEUR dans chaque route.
+enum Role {
+  DIRIGEANT
+  COMMERCIAL
+}
+
+/// Profil applicatif d'un utilisateur.
+/// `id` = identifiant Supabase Auth (auth.users.id) : l'authentification (magic link)
+/// est gérée par Supabase ; cette table porte le rôle et les métadonnées métier.
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String?
+  role      Role     @default(COMMERCIAL)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_user")
+}
+
+/// Journal des demandes de magic link — sert au rate limiting (§3, §8 : anti-abus / anti-spam).
+model MagicLinkRequest {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@map("magic_link_request")
+}

@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Charte Lynova (§7)
+   bleu nuit #0A1733 (barre latérale, en-têtes) · cyan #6FD6F2 (accent) · fond clair #F6F8FB */
+@theme {
+  --color-navy: #0a1733;
+  --color-navy-700: #16244a;
+  --color-cyan: #6fd6f2;
+  --color-cyan-600: #3cbfe6;
+  --color-cloud: #f6f8fb;
+
+  --color-background: #f6f8fb;
+  --color-foreground: #0a1733;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
