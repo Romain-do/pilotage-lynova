@@ -1,0 +1,81 @@
+<!-- Modèle d'e-mail "Magic Link" — Cockpit Lynova.
+     À coller dans Supabase : Authentication > Emails > onglet "Magic Link" (champ Message body, mode HTML).
+     Sujet suggéré : Votre lien de connexion au Cockpit Lynova
+     Variable Supabase utilisée : {{ .ConfirmationURL }} -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F8FB;margin:0;padding:32px 0;font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:480px;background-color:#FFFFFF;border-radius:14px;overflow:hidden;border:1px solid #E6EAF1;">
+
+        <!-- En-tête bleu nuit -->
+        <tr>
+          <td style="background-color:#0A1733;padding:26px 32px;">
+            <span style="font-size:24px;font-weight:bold;letter-spacing:3px;color:#FFFFFF;">L<span style="color:#6FD6F2;">Y</span>NOVA</span>
+          </td>
+        </tr>
+
+        <!-- Corps -->
+        <tr>
+          <td style="padding:36px 32px 8px 32px;">
+            <h1 style="margin:0 0 14px 0;font-size:20px;color:#0A1733;font-weight:bold;">Votre lien de connexion</h1>
+            <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#43506B;">
+              Bonjour,<br><br>
+              Voici votre lien sécurisé pour accéder au <strong style="color:#0A1733;">Cockpit Lynova</strong>.
+              Cliquez sur le bouton ci-dessous pour vous connecter — aucun mot de passe n'est nécessaire.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Bouton -->
+        <tr>
+          <td align="center" style="padding:0 32px 28px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" bgcolor="#0A1733" style="border-radius:10px;">
+                  <a href="{{ .ConfirmationURL }}" target="_blank"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;border-radius:10px;">
+                    Se connecter au cockpit
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Note de sécurité -->
+        <tr>
+          <td style="padding:0 32px 28px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F8FB;border-radius:10px;">
+              <tr>
+                <td style="padding:14px 16px;font-size:13px;line-height:1.6;color:#5C6780;">
+                  Ce lien est valable <strong style="color:#0A1733;">1 heure</strong> et à usage unique.
+                  Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail — votre compte reste protégé.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Lien de secours -->
+        <tr>
+          <td style="padding:0 32px 32px 32px;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#8893A8;">
+              Le bouton ne fonctionne pas ? Copiez-collez ce lien dans votre navigateur :<br>
+              <a href="{{ .ConfirmationURL }}" style="color:#0B7C9E;word-break:break-all;">{{ .ConfirmationURL }}</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Pied -->
+        <tr>
+          <td style="background-color:#F6F8FB;padding:18px 32px;border-top:1px solid #E6EAF1;">
+            <p style="margin:0;font-size:12px;color:#8893A8;">
+              Lynova — pilotage des finances, de la facturation et de la prospection.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -31,6 +32,14 @@ export default async function Home() {
             <span className="rounded-full bg-cyan/20 px-2.5 py-1 text-xs font-medium text-cyan">
               {ROLE_LABEL[user.role] ?? user.role}
             </span>
+            {user.role === "DIRIGEANT" && (
+              <Link
+                href="/admin"
+                className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
+              >
+                Administration
+              </Link>
+            )}
             <form action="/auth/signout" method="post">
               <button
                 type="submit"

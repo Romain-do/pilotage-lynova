@@ -62,7 +62,7 @@ reference/        Code d'auth des API externes du prototype (à transposer, hors
 
 - [x] **1. Ossature** — Next.js + Tailwind + Prisma + Supabase + accueil sécurisé
 - [x] **2. Auth magic link** — Supabase OTP, modèle User + rôles, écran de connexion, rate limiting
-- [ ] 3. Gestion des utilisateurs (invitation, rôles, révocation)
+- [x] **3. Gestion des utilisateurs** — écran /admin (DIRIGEANT) : ajouter, changer le rôle, révoquer/réactiver (archivage logique)
 - [ ] 4. Prospection native + import Trello
 - [ ] 5. Intégration Evoliz (facturation)
 - [ ] 6. Intégration Revolut (trésorerie)
