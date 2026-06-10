@@ -49,6 +49,50 @@ model MagicLinkRequest {
   @@map("magic_link_request")
 }
 
+// ───────────────────────── Facturation Evoliz (§5) ─────────────────────────
+// Cache local en lecture seule des factures et avoirs Evoliz, rafraîchi par sync
+// (pas d'appel API à chaque page). Les montants HT/TTC sont stockés tels quels.
+
+enum EvolizDocKind {
+  INVOICE // facture
+  CREDIT // avoir (note de crédit)
+}
+
+/// Une facture OU un avoir Evoliz (typé par `kind`). Source : API Evoliz.
+model EvolizDocument {
+  id             String        @id @default(uuid()) @db.Uuid
+  kind           EvolizDocKind
+  evolizId       Int // invoiceid / creditid côté Evoliz
+  documentNumber String?
+  documentDate   DateTime
+  clientId       Int?
+  clientName     String?
+  totalHt        Decimal       @db.Decimal(12, 2) // total.vat_exclude (HT)
+  totalTtc       Decimal       @db.Decimal(12, 2) // total.vat_include (TTC)
+  paid           Decimal       @default(0) @db.Decimal(12, 2)
+  netToPay       Decimal       @default(0) @db.Decimal(12, 2)
+  status         String?
+  enabled        Boolean       @default(true) // false = document annulé (hors CA)
+  invoiceRef     String? // pour un avoir : numéro de la facture créditée (champ invoice_ref)
+  included       Boolean       @default(true) // compte dans le CA (validé, non brouillon, hors avoir d'annulation)
+  syncedAt       DateTime      @default(now())
+
+  @@unique([kind, evolizId])
+  @@index([documentDate])
+  @@index([included])
+  @@map("evoliz_document")
+}
+
+/// État de synchronisation d'une source externe (Evoliz, Revolut…).
+model SyncState {
+  source     String    @id // "evoliz", "revolut"…
+  lastSyncAt DateTime?
+  detail     String? // résumé JSON de la dernière synchro
+  updatedAt  DateTime  @updatedAt
+
+  @@map("sync_state")
+}
+
 // ───────────────────────── Prospection native (§6) ─────────────────────────
 // Remplace Trello. Accessible aux deux rôles (lecture + écriture). Pas de
 // suppression physique : archivage logique (`archived`). Labels & journal

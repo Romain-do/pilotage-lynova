@@ -3,14 +3,28 @@
 /* Charte Lynova (§7)
    bleu nuit #0A1733 (barre latérale, en-têtes) · cyan #6FD6F2 (accent) · fond clair #F6F8FB */
 @theme {
-  --color-navy: #0a1733;
+  /* Bleu nuit & accents */
+  --color-navy: #0a1733; /* texte fort / fonds sombres */
   --color-navy-700: #16244a;
-  --color-cyan: #6fd6f2;
-  --color-cyan-600: #3cbfe6;
-  --color-cloud: #f6f8fb;
+  --color-cyan: #6fd6f2; /* accent */
+  --color-cyan-600: #0b7c9e; /* cyan foncé : texte/accents sur blanc */
+  --color-cloud: #f6f8fb; /* fond app */
+
+  /* Surfaces & lignes */
+  --color-line: #e6eaf1; /* bordures douces */
+
+  /* Texte */
+  --color-ink: #0a1733; /* titres */
+  --color-ink-2: #43506b; /* secondaire */
+  --color-ink-3: #8893a8; /* tertiaire */
 
   --color-background: #f6f8fb;
   --color-foreground: #0a1733;
+
+  /* Rayons & ombres */
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgba(10, 23, 51, 0.04), 0 6px 20px rgba(10, 23, 51, 0.06);
+  --shadow-card-hover: 0 2px 6px rgba(10, 23, 51, 0.07), 0 14px 34px rgba(10, 23, 51, 0.1);
 
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
@@ -19,4 +33,14 @@
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+}
+
+/* Animation d'entrée des barres (gatée par motion-safe côté composant) */
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
 }
