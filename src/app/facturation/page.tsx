@@ -28,7 +28,7 @@ export default async function FacturationPage() {
         clientName: true,
       },
     }),
-    prisma.syncState.findUnique({ where: { source: "evoliz" } }),
+    prisma.syncState.findMany({ where: { source: { in: ["evoliz", "evoliz_buys"] } } }),
     // Achats fournisseurs (marge commerciale), avec lignes ventilées par catégorie.
     prisma.evolizBuy.findMany({
       where: { included: true },
@@ -65,7 +65,12 @@ export default async function FacturationPage() {
   }));
 
   const todayISO = new Date().toISOString().slice(0, 10);
-  const lastSync = sync?.lastSyncAt ? sync.lastSyncAt.toISOString() : null;
+  // « Dernière synchro » = la plus ANCIENNE des deux sources (reflète un refresh complet).
+  const syncDates = sync.map((s) => s.lastSyncAt).filter((d): d is Date => d != null);
+  const lastSync =
+    syncDates.length > 0
+      ? new Date(Math.min(...syncDates.map((d) => d.getTime()))).toISOString()
+      : null;
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
