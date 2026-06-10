@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { mapProspect } from "@/lib/prospection-map";
 import type { StageDTO, GroupDTO } from "@/lib/prospection";
+import { lastSyncAll } from "@/lib/sync-state";
 import { Prospection } from "./Prospection";
 import { createStarterPipeline } from "./actions";
 
@@ -18,7 +19,7 @@ export default async function ProspectionPage({
   const me = await requireUser();
   const { prospect } = await searchParams;
 
-  const [pipeline, groups] = await Promise.all([
+  const [pipeline, groups, lastSync] = await Promise.all([
     prisma.pipeline.findFirst({
       where: { archived: false },
       orderBy: { createdAt: "asc" },
@@ -36,6 +37,7 @@ export default async function ProspectionPage({
       },
     }),
     prisma.group.findMany({ orderBy: { name: "asc" } }),
+    lastSyncAll(prisma),
   ]);
 
   const groupDTOs: GroupDTO[] = groups.map((g) => ({ id: g.id, name: g.name, color: g.color }));
@@ -66,6 +68,7 @@ export default async function ProspectionPage({
           pipelineName={pipeline.name}
           currentUser={{ id: me.id, name: me.name, role: me.role }}
           initialSelectedId={prospect ?? null}
+          lastSync={lastSync}
           initialGroups={groupDTOs}
           initialStages={pipeline.stages.map<StageDTO>((s) => ({
             id: s.id,

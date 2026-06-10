@@ -18,6 +18,7 @@ import {
   assignGroup,
   deleteProspect,
 } from "./actions";
+import { RefreshButton } from "@/components/RefreshButton";
 import { ProspectDrawer } from "./ProspectDrawer";
 import { ListView } from "./ListView";
 import { AgendaView } from "./AgendaView";
@@ -44,12 +45,14 @@ export function Prospection({
   initialGroups,
   initialStages,
   initialSelectedId = null,
+  lastSync = null,
 }: {
   pipelineName: string;
   currentUser: CurrentUserDTO;
   initialGroups: GroupDTO[];
   initialStages: StageDTO[];
   initialSelectedId?: string | null;
+  lastSync?: string | null;
 }) {
   const [stages, setStages] = useState<StageDTO[]>(initialStages);
   const [groups, setGroups] = useState<GroupDTO[]>(initialGroups);
@@ -176,6 +179,9 @@ export function Prospection({
             <p className="text-sm text-navy/55">{allProspects.length} prospect(s)</p>
           </div>
           <div className="flex items-center gap-2">
+            {currentUser.role === "DIRIGEANT" && (
+              <RefreshButton variant="generic" initialLastSync={lastSync} />
+            )}
             <button
               type="button"
               onClick={() => setManagerOpen(true)}

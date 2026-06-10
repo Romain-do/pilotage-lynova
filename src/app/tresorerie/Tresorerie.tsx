@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import {
   IconWallet,
   IconCoins,
   IconCurrencyBitcoin,
   IconArrowsExchange,
-  IconRefresh,
   IconArrowUpRight,
   IconArrowDownRight,
   IconX,
@@ -35,7 +34,7 @@ import {
   type CryptoPnl,
   type TCatRow,
 } from "@/lib/tresorerie";
-import { refreshRevolut } from "./actions";
+import { RefreshButton } from "@/components/RefreshButton";
 
 interface Data {
   accounts: TAccount[];
@@ -109,7 +108,7 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
                 Perso
               </button>
             </div>
-            <RefreshButton initialLastSync={data.lastSync} />
+            <RefreshButton variant="revolut" initialLastSync={data.lastSync} />
           </div>
           {customOpen && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
@@ -550,48 +549,3 @@ function CategoryDrawer({ cat, lines, onClose }: { cat: TCatRow; lines: OutflowR
   );
 }
 
-/* ───────────── Actualiser ───────────── */
-function RefreshButton({ initialLastSync }: { initialLastSync: string | null }) {
-  const [pending, start] = useTransition();
-  const [lastSync, setLastSync] = useState(initialLastSync);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setNow(Date.now()));
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => { cancelAnimationFrame(id); clearInterval(t); };
-  }, []);
-
-  function run() {
-    setMsg(null);
-    start(async () => {
-      const r = await refreshRevolut();
-      setMsg({ ok: r.ok, text: r.message });
-      if (r.ok && r.lastSync) setLastSync(r.lastSync);
-      setTimeout(() => setMsg(null), 6000);
-    });
-  }
-  const relStr = lastSync && now ? relativeTime(lastSync, now) : null;
-  return (
-    <div className="flex items-center gap-2">
-      <button type="button" onClick={run} disabled={pending}
-        className="inline-flex items-center gap-2 rounded-card bg-navy px-3 py-1.5 text-sm font-medium text-white shadow-card transition-colors hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-70">
-        <IconRefresh size={16} stroke={2} className={pending ? "animate-spin" : ""} />
-        {pending ? "Actualisation…" : "Actualiser"}
-      </button>
-      {msg ? (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{msg.text}</span>
-      ) : (
-        relStr && <span className="text-xs text-ink-3" suppressHydrationWarning>maj {relStr}</span>
-      )}
-    </div>
-  );
-}
-function relativeTime(iso: string, now: number): string {
-  const s = Math.max(0, (now - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "à l'instant";
-  if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
-  return `il y a ${Math.floor(s / 86400)} j`;
-}

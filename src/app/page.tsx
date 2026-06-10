@@ -17,6 +17,7 @@ import {
   type BuyDoc,
 } from "@/lib/facturation";
 import { buildTresorerie } from "@/lib/tresorerie-data";
+import { lastSyncAll } from "@/lib/sync-state";
 import {
   flowsInRange,
   netChargesInRange,
@@ -53,7 +54,7 @@ const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
 async function buildCockpitData(): Promise<CockpitData> {
   const todayISO = new Date().toISOString().slice(0, 10);
 
-  const [docRows, buyRows, treso, pipeline] = await Promise.all([
+  const [docRows, buyRows, treso, pipeline, lastSync] = await Promise.all([
     prisma.evolizDocument.findMany({
       where: { kind: "INVOICE", included: true },
       select: { kind: true, documentDate: true, totalHt: true, totalTtc: true, paid: true, netToPay: true, clientId: true, clientName: true },
@@ -70,6 +71,7 @@ async function buildCockpitData(): Promise<CockpitData> {
         },
       },
     }),
+    lastSyncAll(prisma),
   ]);
 
   const docs: FactDoc[] = docRows.map((d) => ({
@@ -148,6 +150,7 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   return {
     fyLabel: fyLabel(fy),
+    lastSync,
     finance: {
       caHt: cur.caHtTotal,
       caDelta: rel(cur.caHtTotal, prev.caHtTotal),

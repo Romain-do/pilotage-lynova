@@ -19,10 +19,12 @@ import {
 } from "@tabler/icons-react";
 import { Logo } from "@/components/Logo";
 import { KpiCard } from "@/components/KpiCard";
+import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
 
 export interface CockpitData {
   fyLabel: string;
+  lastSync: string | null;
   finance: {
     caHt: number; caDelta: number | null;
     margeNette: number; margeNetteDelta: number | null; hasBank: boolean;
@@ -100,16 +102,19 @@ export function Cockpit({
             <h1 className="text-2xl font-semibold text-ink">Bonjour {firstName}</h1>
             <p className="mt-1 text-sm capitalize text-ink-3">{dateLabel}</p>
           </div>
-          <nav className="flex flex-wrap gap-2">
-            {QUICK.map(({ href, label, Icon }) => (
-              <Link key={href} href={href}
-                className="inline-flex items-center gap-2 rounded-card border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink shadow-card transition-all hover:border-cyan/60 hover:shadow-card-hover">
-                <Icon size={16} stroke={2} className="text-cyan-600" />
-                {label}
-                <IconChevronRight size={14} className="text-ink-3" />
-              </Link>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-2">
+            <nav className="flex flex-wrap gap-2">
+              {QUICK.map(({ href, label, Icon }) => (
+                <Link key={href} href={href}
+                  className="inline-flex items-center gap-2 rounded-card border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink shadow-card transition-all hover:border-cyan/60 hover:shadow-card-hover">
+                  <Icon size={16} stroke={2} className="text-cyan-600" />
+                  {label}
+                  <IconChevronRight size={14} className="text-ink-3" />
+                </Link>
+              ))}
+            </nav>
+            <RefreshButton variant="generic" initialLastSync={data.lastSync} />
+          </div>
         </div>
 
         {/* Actions prioritaires */}

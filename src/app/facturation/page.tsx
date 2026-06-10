@@ -4,6 +4,7 @@ import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { FactDoc, BuyDoc, BuyItemDoc } from "@/lib/facturation";
 import { buildTresorerie } from "@/lib/tresorerie-data";
+import { lastSyncAll } from "@/lib/sync-state";
 import { Facturation } from "./Facturation";
 
 // Vue Facturation (§5) — réservée au DIRIGEANT (donnée financière, §3).
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function FacturationPage() {
   await requireDirigeant();
 
-  const [docs, sync, buyRows] = await Promise.all([
+  const [docs, lastSync, buyRows] = await Promise.all([
     // CA brut (aligné Evoliz) : on ne lit que les factures validées ; les avoirs ne sont
     // jamais déduits du CA (kind = CREDIT ignoré).
     prisma.evolizDocument.findMany({
@@ -29,7 +30,8 @@ export default async function FacturationPage() {
         clientName: true,
       },
     }),
-    prisma.syncState.findMany({ where: { source: { in: ["evoliz", "evoliz_buys"] } } }),
+    // « Dernière synchro » globale (Evoliz + Revolut), cohérente avec le bouton unifié.
+    lastSyncAll(prisma),
     // Achats fournisseurs (marge commerciale), avec lignes ventilées par catégorie.
     prisma.evolizBuy.findMany({
       where: { included: true },
@@ -75,12 +77,6 @@ export default async function FacturationPage() {
   }));
 
   const todayISO = new Date().toISOString().slice(0, 10);
-  // « Dernière synchro » = la plus ANCIENNE des deux sources (reflète un refresh complet).
-  const syncDates = sync.map((s) => s.lastSyncAt).filter((d): d is Date => d != null);
-  const lastSync =
-    syncDates.length > 0
-      ? new Date(Math.min(...syncDates.map((d) => d.getTime()))).toISOString()
-      : null;
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
