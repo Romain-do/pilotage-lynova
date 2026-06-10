@@ -167,6 +167,9 @@ export function Facturation({
         <div className="rounded-card border border-line bg-white p-4 shadow-card">
           <h2 className="text-sm font-semibold text-ink">Achats par catégorie</h2>
           <p className="text-xs text-ink-3">Cliquez une catégorie pour le détail</p>
+          <p className="mt-0.5 text-xs italic text-ink-3">
+            Électricité (captée via Revolut) — exclue de la marge commerciale Evoliz
+          </p>
           <CategoryBreakdown cats={cats} onPick={setDrill} />
         </div>
       </div>

@@ -18,13 +18,26 @@ export interface FactDoc {
 export interface BuyDoc {
   date: string;
   ht: number;
+  supplierId: number | null;
 }
 export interface BuyItemDoc {
   date: string;
+  supplierId: number | null;
   supplierName: string | null;
   categoryCode: string | null;
   categoryLabel: string | null;
   ht: number;
+}
+
+/**
+ * Fournisseurs « captés via Revolut, hors marge Evoliz » — exclus du calcul de la
+ * marge (total achats, marge, répartition par catégorie) pour éviter le double comptage.
+ * Filtré au calcul seulement : les données restent dans le cache (traçabilité).
+ *   - 2781901 : électricité (facturée aussi via les virements Revolut)
+ */
+export const SUPPLIERS_EXCLUDED_FROM_MARGE = new Set<number>([2781901]);
+function isExcludedSupplier(id: number | null): boolean {
+  return id != null && SUPPLIERS_EXCLUDED_FROM_MARGE.has(id);
 }
 
 export type TypeFilter = "all" | "abo" | "install";
@@ -196,7 +209,7 @@ export function computeRange(
     if (matchesType(d.ht, filter)) caHt += d.ht;
   }
   for (const b of buys) {
-    if (!inRange(b.date, range)) continue;
+    if (!inRange(b.date, range) || isExcludedSupplier(b.supplierId)) continue;
     achatsHt += b.ht;
     const i = idx.get(b.date.slice(0, 7));
     if (i != null) achatsByMonth[i] += b.ht;
@@ -279,7 +292,7 @@ export interface CatRow {
 export function computeBuyCategories(items: BuyItemDoc[], range: DateRange): CatRow[] {
   const map = new Map<string, CatRow>();
   for (const it of items) {
-    if (!inRange(it.date, range)) continue;
+    if (!inRange(it.date, range) || isExcludedSupplier(it.supplierId)) continue;
     const label = it.categoryLabel ?? "(sans catégorie)";
     const key = `${it.categoryCode ?? "—"}|${label}`;
     const cur = map.get(key) ?? { code: it.categoryCode, label, ht: 0 };
@@ -297,7 +310,12 @@ export interface BuyLine {
 /** Détail des lignes d'achat d'une catégorie sur la plage (tri montant décroissant). */
 export function categoryDetail(items: BuyItemDoc[], range: DateRange, label: string): BuyLine[] {
   return items
-    .filter((it) => inRange(it.date, range) && (it.categoryLabel ?? "(sans catégorie)") === label)
+    .filter(
+      (it) =>
+        inRange(it.date, range) &&
+        !isExcludedSupplier(it.supplierId) &&
+        (it.categoryLabel ?? "(sans catégorie)") === label
+    )
     .map((it) => ({ supplierName: it.supplierName ?? "—", date: it.date, ht: it.ht }))
     .sort((a, b) => b.ht - a.ht);
 }
