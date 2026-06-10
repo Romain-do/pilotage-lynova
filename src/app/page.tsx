@@ -67,28 +67,38 @@ export default async function Home() {
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {["Cockpit", "Trésorerie"].map((v) => (
-            <div
-              key={v}
-              className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm"
-            >
-              <p className="font-medium text-navy">{v}</p>
-              <p className="mt-1 text-sm text-navy/50">À venir</p>
-            </div>
-          ))}
+          <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
+            <p className="font-medium text-navy">Cockpit</p>
+            <p className="mt-1 text-sm text-navy/50">À venir</p>
+          </div>
           {user.role === "DIRIGEANT" ? (
-            <Link
-              href="/facturation"
-              className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
-            >
-              <p className="font-medium text-navy">Facturation</p>
-              <p className="mt-1 text-sm text-cyan-600">Ouvrir →</p>
-            </Link>
+            <>
+              <Link
+                href="/tresorerie"
+                className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
+              >
+                <p className="font-medium text-navy">Trésorerie</p>
+                <p className="mt-1 text-sm text-cyan-600">Ouvrir →</p>
+              </Link>
+              <Link
+                href="/facturation"
+                className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
+              >
+                <p className="font-medium text-navy">Facturation</p>
+                <p className="mt-1 text-sm text-cyan-600">Ouvrir →</p>
+              </Link>
+            </>
           ) : (
-            <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
-              <p className="font-medium text-navy">Facturation</p>
-              <p className="mt-1 text-sm text-navy/50">Réservé direction</p>
-            </div>
+            <>
+              <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
+                <p className="font-medium text-navy">Trésorerie</p>
+                <p className="mt-1 text-sm text-navy/50">Réservé direction</p>
+              </div>
+              <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
+                <p className="font-medium text-navy">Facturation</p>
+                <p className="mt-1 text-sm text-navy/50">Réservé direction</p>
+              </div>
+            </>
           )}
           <Link
             href="/prospection"
