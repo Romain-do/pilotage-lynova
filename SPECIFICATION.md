@@ -192,7 +192,9 @@ Label      { id, name, color }  /  ProspectLabel { prospectId, labelId }
 - **Créer un prospect** : formulaire (nom/société, contact, statut initial, rappel, note).
 - **Cocher une relance « faite »** (`reminderDone`).
 - Vues complémentaires : relances en retard / cette semaine / planifiées, activité récente, taux de transformation.
-- **Pas de suppression** physique (archivage logique uniquement) — cohérent avec la règle de sécurité.
+- **Pas de suppression physique** : archivage logique uniquement (`archived = true`) — y compris
+  l'action « Archiver » du dirigeant. La donnée reste en base, seulement retirée des listes
+  (qui filtrent `archived: false`). Cohérent avec la règle de sécurité (§3).
 
 ### Migration
 1. Script `scripts/import-trello.ts` : lit le tableau « Pipe et ventes », crée Stages + Prospects + Comments.

@@ -177,13 +177,14 @@ export async function archiveProspect(prospectId: string): Promise<void> {
 }
 
 /**
- * SUPPRESSION DÉFINITIVE d'un prospect (+ ses commentaires en cascade).
- * RÉSERVÉE AU DIRIGEANT — garde CÔTÉ SERVEUR (§3). Le COMMERCIAL est rejeté
- * même s'il appelle l'action directement (POST direct).
+ * Retrait d'un prospect par le DIRIGEANT : ARCHIVAGE LOGIQUE uniquement (§8 — aucune
+ * suppression physique). La donnée est conservée en base (archived = true), juste retirée
+ * des listes. RÉSERVÉE AU DIRIGEANT — garde CÔTÉ SERVEUR (§3) ; le COMMERCIAL est rejeté
+ * même par appel direct.
  */
 export async function deleteProspect(prospectId: string): Promise<void> {
   await requireDirigeant();
-  await prisma.prospect.delete({ where: { id: prospectId } }); // commentaires supprimés en cascade
+  await prisma.prospect.update({ where: { id: prospectId }, data: { archived: true } });
   revalidatePath("/prospection");
 }
 

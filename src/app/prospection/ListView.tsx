@@ -10,7 +10,7 @@ import {
   IconTrophy,
   IconPhone,
   IconChevronDown,
-  IconTrash,
+  IconArchive,
 } from "@tabler/icons-react";
 import {
   formatDateFR,
@@ -583,16 +583,16 @@ function DeleteBtn({ name, onDelete }: { name: string; onDelete: () => void }) {
         e.stopPropagation();
         if (
           confirm(
-            `Supprimer définitivement « ${name} » ?\nCette action est irréversible : le prospect et ses commentaires seront supprimés.`
+            `Archiver « ${name} » ?\nIl sera retiré de la liste mais conservé en base (réversible).`
           )
         )
           onDelete();
       }}
-      className="rounded-lg p-1.5 text-navy/30 transition-colors hover:bg-red-50 hover:text-red-600"
-      aria-label={`Supprimer ${name}`}
-      title="Supprimer définitivement"
+      className="rounded-lg p-1.5 text-navy/30 transition-colors hover:bg-amber-50 hover:text-amber-600"
+      aria-label={`Archiver ${name}`}
+      title="Archiver (retiré de la liste, conservé en base)"
     >
-      <IconTrash size={16} stroke={2} />
+      <IconArchive size={16} stroke={2} />
     </button>
   );
 }
