@@ -181,6 +181,8 @@ export interface RangeStats {
   invoiceCount: number;
   months: { key: string; label: string }[];
   caByMonth: number[]; // CA total par mois civil
+  aboByMonth: number[]; // dont abonnements
+  installByMonth: number[]; // dont installations
   achatsByMonth: number[];
 }
 
@@ -193,19 +195,26 @@ export function computeRange(
   const months = monthsInRange(range);
   const idx = new Map(months.map((m, i) => [m.key, i]));
   const caByMonth = new Array(months.length).fill(0);
+  const aboByMonth = new Array(months.length).fill(0);
+  const installByMonth = new Array(months.length).fill(0);
   const achatsByMonth = new Array(months.length).fill(0);
   let caHt = 0, caHtTotal = 0, aboHt = 0, installHt = 0, encaisseTtc = 0, resteTtc = 0, invoiceCount = 0, achatsHt = 0;
 
   for (const d of docs) {
     if (d.kind !== "INVOICE" || !inRange(d.date, range)) continue;
     caHtTotal += d.ht;
-    if (isInstallation(d.ht)) installHt += d.ht;
+    const install = isInstallation(d.ht);
+    if (install) installHt += d.ht;
     else aboHt += d.ht;
     encaisseTtc += d.paid;
     resteTtc += d.netToPay;
     invoiceCount++;
     const i = idx.get(d.date.slice(0, 7));
-    if (i != null) caByMonth[i] += d.ht;
+    if (i != null) {
+      caByMonth[i] += d.ht;
+      if (install) installByMonth[i] += d.ht;
+      else aboByMonth[i] += d.ht;
+    }
     if (matchesType(d.ht, filter)) caHt += d.ht;
   }
   for (const b of buys) {
@@ -229,6 +238,8 @@ export function computeRange(
     invoiceCount,
     months,
     caByMonth,
+    aboByMonth,
+    installByMonth,
     achatsByMonth,
   };
 }

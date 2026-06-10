@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   IconCoin,
   IconPigMoney,
+  IconReportMoney,
   IconPercentage,
   IconRepeat,
   IconRefresh,
@@ -35,6 +36,7 @@ import {
   type PresetKey,
   type CatRow,
 } from "@/lib/facturation";
+import { netChargesInRange, earliestOutflowDate, type OutflowRow } from "@/lib/tresorerie";
 import { refreshEvoliz } from "./actions";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -53,12 +55,14 @@ export function Facturation({
   docs,
   buys,
   buyItems,
+  outflows,
   todayISO,
   lastSync,
 }: {
   docs: FactDoc[];
   buys: BuyDoc[];
   buyItems: BuyItemDoc[];
+  outflows: OutflowRow[];
   todayISO: string;
   lastSync: string | null;
 }) {
@@ -83,6 +87,20 @@ export function Facturation({
   const clients = useMemo(() => computeClients(docs, range), [docs, range]);
   const cats = useMemo(() => computeBuyCategories(buyItems, range), [buyItems, range]);
 
+  // ── Marge nette approchée (CA − achats Evoliz − charges Revolut hors Evoliz) ──
+  const bankStart = useMemo(() => earliestOutflowDate(outflows), [outflows]);
+  const netCur = useMemo(() => netChargesInRange(outflows, range), [outflows, range]);
+  const netPrev = useMemo(() => netChargesInRange(outflows, shiftYear(range)), [outflows, range]);
+  // Données bancaires dispo si la plage atteint au moins le début du cache Revolut.
+  const hasBank = bankStart != null && range.end >= bankStart;
+  const hasBankPrev = bankStart != null && shiftYear(range).end >= bankStart;
+  const margeNette = cur.marge - netCur.total;
+  const margeNettePrev = prev.marge - netPrev.total;
+  const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
+  const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
+  const tauxNetteDeltaPts =
+    hasBank && hasBankPrev && tauxNette != null && tauxNettePrev != null ? tauxNette - tauxNettePrev : null;
+
   const months = Math.max(1, cur.months.length);
   const avg = cur.caHtTotal / months;
   const avgPrev = prev.caHtTotal / Math.max(1, prev.months.length);
@@ -91,9 +109,6 @@ export function Facturation({
     () => [...clients].sort((a, b) => (clientSort === "ca" ? b.ca - a.ca : b.aboHt - a.aboHt)).slice(0, 12),
     [clients, clientSort]
   );
-
-  const tauxDeltaPts =
-    cur.taux !== null && prev.taux !== null ? cur.taux - prev.taux : null;
 
   return (
     <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
@@ -116,10 +131,26 @@ export function Facturation({
       </div>
 
       {/* ───────── KPI principaux ───────── */}
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA HT" value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} />
         <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge commerciale" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)} />
-        <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge" value={cur.taux != null ? `${cur.taux.toFixed(1)} %` : "—"} delta={tauxDeltaPts} deltaUnit="pts" />
+        <MargeNetteCard
+          hasBank={hasBank}
+          value={margeNette}
+          delta={hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null}
+          caHtTotal={cur.caHtTotal}
+          achatsHt={cur.achatsHt}
+          net={netCur}
+        />
+        <KpiCard
+          icon={<IconPercentage size={18} stroke={2} />}
+          tint="bg-amber-50 text-amber-600"
+          label="Taux de marge nette"
+          value={hasBank && tauxNette != null ? `${tauxNette.toFixed(1)} %` : "n/a"}
+          muted={!hasBank}
+          delta={tauxNetteDeltaPts}
+          deltaUnit="pts"
+        />
         <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct} />
       </div>
 
@@ -137,11 +168,17 @@ export function Facturation({
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">CA vs Achats — mensuel HT</h2>
             <div className="flex items-center gap-3 text-xs text-ink-2">
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> CA</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Abonnement</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan/40" /> Installation</span>
               <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Achats</span>
             </div>
           </div>
-          <MonthlyChart months={cur.months} ca={cur.caByMonth} achats={cur.achatsByMonth} />
+          <MonthlyChart
+            months={cur.months}
+            abo={cur.aboByMonth}
+            install={cur.installByMonth}
+            achats={cur.achatsByMonth}
+          />
         </div>
 
         <SynthBlock stats={cur} />
@@ -275,10 +312,10 @@ function Toolbar({
 /* ───────────────────────── KPI & stats ───────────────────────── */
 
 function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%",
+  icon, tint, label, value, delta, deltaUnit = "%", muted = false,
 }: {
   icon: React.ReactNode; tint: string; label: string; value: string;
-  delta?: number | null; deltaUnit?: string;
+  delta?: number | null; deltaUnit?: string; muted?: boolean;
 }) {
   return (
     <div className="group rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
@@ -286,7 +323,7 @@ function KpiCard({
         <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
         <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
       </div>
-      <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{value}</div>
+      <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
       <div className="mt-1.5 min-h-4 text-xs">
         {delta == null ? (
           <span className="text-ink-3">Vs N-1 : —</span>
@@ -300,6 +337,63 @@ function KpiCard({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+// Carte « Marge nette (approchée) » = CA HT − achats Evoliz − (rémunération + loyer + électricité
+// captés via Revolut). Grise et explicite si la plage précède les données bancaires (nov. 2024).
+function MargeNetteCard({
+  hasBank, value, delta, caHtTotal, achatsHt, net,
+}: {
+  hasBank: boolean; value: number; delta: number | null;
+  caHtTotal: number; achatsHt: number;
+  net: { remuneration: number; loyer: number; electricite: number; total: number };
+}) {
+  return (
+    <div className="group relative rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-violet-50 text-violet-600">
+          <IconReportMoney size={18} stroke={2} />
+        </span>
+        <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">Marge nette (approchée)</span>
+      </div>
+      {hasBank ? (
+        <>
+          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{euro(value)}</div>
+          <div className="mt-1.5 min-h-4 text-xs">
+            {delta == null ? (
+              <span className="text-ink-3">Vs N-1 : —</span>
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                  {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
+                  {Math.abs(delta).toFixed(1)} %
+                </span>
+                <span className="text-ink-3">Vs N-1</span>
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">charges nettes captées depuis nov. 2024</p>
+          {/* Détail au survol */}
+          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-60 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block">
+            <div className="font-semibold text-ink">Marge nette approchée</div>
+            <div className="mt-2 space-y-1">
+              <TipRow label="CA HT" value={euro(caHtTotal)} />
+              <TipRow label="− Achats Evoliz" value={euro(-achatsHt)} />
+              <TipRow label="− Rémunération" value={euro(-net.remuneration)} />
+              <TipRow label="− Loyer" value={euro(-net.loyer)} />
+              <TipRow label="− Électricité" value={euro(-net.electricite)} />
+              <div className="mt-1 border-t border-line pt-1"><TipRow label="= Marge nette" value={euro(value)} strong /></div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink-3">n/a</div>
+          <p className="mt-1.5 min-h-4 text-xs leading-tight text-ink-3">pas de données bancaires avant nov. 2024</p>
+        </>
+      )}
     </div>
   );
 }
@@ -322,20 +416,21 @@ function StatCell({ label, value, delta }: { label: string; value: string; delta
 
 /* ───────────────────────── Graphe mensuel ───────────────────────── */
 
-function MonthlyChart({ months, ca, achats }: { months: { key: string; label: string }[]; ca: number[]; achats: number[] }) {
+function MonthlyChart({ months, abo, install, achats }: { months: { key: string; label: string }[]; abo: number[]; install: number[]; achats: number[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const ca = months.map((_, i) => abo[i] + install[i]);
   const max = Math.max(1, ...ca, ...achats);
   const n = months.length;
   return (
     <div className="relative mt-3" onMouseLeave={() => setHover(null)}>
-      <div className="flex h-48 items-end gap-0.5 sm:gap-1">
+      <div className="flex h-48 items-end gap-1 sm:gap-1.5">
         {months.map((m, i) => {
           const active = hover === null || hover === i;
           return (
             <div key={m.key} className="relative flex h-full flex-1 cursor-default flex-col items-center justify-end rounded-md" onMouseEnter={() => setHover(i)}>
               <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${hover === i ? "bg-cyan/[0.07]" : ""}`} />
-              <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-5">
-                <SimpleBar value={ca[i]} max={max} idx={i} color="bg-cyan" dim={!active} />
+              <div className="relative flex h-full w-full items-end justify-center gap-1 pb-5">
+                <StackedBar abo={abo[i]} install={install[i]} max={max} idx={i} dim={!active} />
                 <SimpleBar value={achats[i]} max={max} idx={i} color="bg-amber-400" dim={!active} />
               </div>
               {(n <= 14 || i % 2 === 0) && (
@@ -346,8 +441,25 @@ function MonthlyChart({ months, ca, achats }: { months: { key: string; label: st
         })}
       </div>
       {hover !== null && (
-        <MargeTooltip index={hover} n={n} label={months[hover].label} ca={ca[hover]} achats={achats[hover]} />
+        <MargeTooltip index={hover} n={n} label={months[hover].label} abo={abo[hover]} install={install[hover]} achats={achats[hover]} />
       )}
+    </div>
+  );
+}
+
+// Barre CA empilée : abonnement (bas, cyan plein) + installation (haut, cyan clair).
+function StackedBar({ abo, install, max, idx, dim }: { abo: number; install: number; max: number; idx: number; dim: boolean }) {
+  const total = abo + install;
+  const h = Math.min(100, (total / max) * 100);
+  const aboFrac = total > 0 ? (abo / total) * 100 : 0;
+  const installFrac = total > 0 ? (install / total) * 100 : 0;
+  return (
+    <div
+      className={`flex w-4 origin-bottom flex-col justify-end overflow-hidden rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${dim ? "opacity-40" : "opacity-100"}`}
+      style={{ height: `${h}%`, animationDelay: `${idx * 20}ms` }}
+    >
+      {install > 0 && <div className="w-full bg-cyan/40" style={{ height: `${installFrac}%` }} />}
+      {abo > 0 && <div className="w-full bg-cyan" style={{ height: `${aboFrac}%` }} />}
     </div>
   );
 }
@@ -356,13 +468,14 @@ function SimpleBar({ value, max, idx, color, dim }: { value: number; max: number
   const h = Math.min(100, (value / max) * 100);
   return (
     <div
-      className={`w-2 origin-bottom rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-2.5 ${color} ${dim ? "opacity-40" : "opacity-100"}`}
+      className={`w-4 origin-bottom rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${color} ${dim ? "opacity-40" : "opacity-100"}`}
       style={{ height: `${h}%`, animationDelay: `${idx * 20}ms` }}
     />
   );
 }
 
-function MargeTooltip({ index, n, label, ca, achats }: { index: number; n: number; label: string; ca: number; achats: number }) {
+function MargeTooltip({ index, n, label, abo, install, achats }: { index: number; n: number; label: string; abo: number; install: number; achats: number }) {
+  const ca = abo + install;
   const marge = ca - achats;
   const taux = ca > 0 ? (marge / ca) * 100 : null;
   const left = ((index + 0.5) / n) * 100;
@@ -372,7 +485,9 @@ function MargeTooltip({ index, n, label, ca, achats }: { index: number; n: numbe
       style={{ left: `${left}%`, ...(alignRight ? { transform: "translateX(-85%)" } : {}) }}>
       <div className="font-semibold text-ink">{label}</div>
       <div className="mt-2 space-y-1">
-        <TipRow label="CA HT" value={euro(ca)} />
+        <TipRow label="Abonnement" value={euro(abo)} />
+        <TipRow label="Installation" value={euro(install)} />
+        <TipRow label="CA HT" value={euro(ca)} strong />
         <TipRow label="Achats HT" value={euro(achats)} />
         <TipRow label="Marge" value={euro(marge)} strong />
       </div>

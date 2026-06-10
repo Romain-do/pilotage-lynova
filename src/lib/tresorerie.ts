@@ -129,6 +129,35 @@ export function categoriesInRange(outflows: OutflowRow[], range: DateRange): TCa
   return [...map.entries()].map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
 }
 
+/** Charges « nettes » captées via Revolut (HT = TTC) servant à la marge nette approchée :
+ *  Rémunération + Loyer + Électricité, HORS Evoliz (pas de double comptage). L'assurance est
+ *  exclue (fournisseur Mapa déjà présent dans les achats Evoliz). Suit la même plage. */
+export interface NetCharges {
+  remuneration: number;
+  loyer: number;
+  electricite: number;
+  total: number;
+}
+export function netChargesInRange(outflows: OutflowRow[], range: DateRange): NetCharges {
+  let remuneration = 0, loyer = 0, electricite = 0;
+  for (const o of outflows) {
+    if (!dateInRange(o.date, range)) continue;
+    switch (categorize(o.reference, o.counterparty)) {
+      case "Rémunération": remuneration += o.amount; break;
+      case "Loyer": loyer += o.amount; break;
+      case "Électricité": electricite += o.amount; break;
+    }
+  }
+  return { remuneration, loyer, electricite, total: remuneration + loyer + electricite };
+}
+
+/** Date du plus ancien décaissement capté (début des données bancaires). */
+export function earliestOutflowDate(outflows: OutflowRow[]): string | null {
+  let min: string | null = null;
+  for (const o of outflows) if (min === null || o.date < min) min = o.date;
+  return min;
+}
+
 /** Total versé à Leaya sur la plage — indépendant de la catégorisation (somme des
  *  décaissements dont le bénéficiaire/libellé contient « leaya »). Alimente la carte KPI
  *  Leaya, alors que la répartition par catégorie range ces montants dans « Fournisseurs ». */
