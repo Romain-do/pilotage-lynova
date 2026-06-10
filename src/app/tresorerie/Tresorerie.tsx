@@ -192,30 +192,26 @@ function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
   const ht = ttc / 1.2; // TVA 20 %
   const delta = ttcPrev > 0 ? rel(ttc, ttcPrev) : null;
   return (
-    <div
-      className="group rounded-card border p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover"
-      style={{ backgroundColor: "#FBF7F2", borderColor: "#EDE3D5" }}
-    >
+    <div className="group rounded-card border border-leaya-border bg-leaya p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex h-8 items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#B8935F" }}>Versé à</span>
-        <span className="font-serif text-lg italic leading-none" style={{ color: "#B8935F" }}>Leaya</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-leaya-gold">Versé à</span>
+        <span className="font-serif text-lg italic leading-none text-leaya-gold">Leaya</span>
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold leading-none" style={{ color: "#7A5A33" }}>{euro(ttc)}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "#B8935F" }}>TTC</span>
+        <span className="text-2xl font-semibold leading-none text-leaya-ink">{euro(ttc)}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide text-leaya-gold">TTC</span>
       </div>
       <div className="mt-1.5 space-y-1 text-xs">
         {delta != null && (
           <span className="inline-flex items-center gap-1">
-            <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold"
-              style={{ backgroundColor: "#F1E7D8", color: "#7A5A33" }}>
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-leaya-badge px-1.5 py-0.5 font-semibold text-leaya-ink">
               {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
               {Math.abs(delta).toFixed(1)} %
             </span>
             <span className="text-ink-3">Vs N-1</span>
           </span>
         )}
-        <div className="text-ink-3">soit <strong className="font-medium" style={{ color: "#7A5A33" }}>{euro(ht)}</strong> HT · TVA 20 %</div>
+        <div className="text-ink-3">soit <strong className="font-medium text-leaya-ink">{euro(ht)}</strong> HT · TVA 20 %</div>
       </div>
     </div>
   );
@@ -313,9 +309,10 @@ function TresoAreaChart({ series }: { series: SeriePoint[] }) {
   const last = pts[n - 1];
   const lastVal = series[n - 1].endBalance;
   const sel = hover ?? n - 1;
+  const ariaLabel = `Évolution de la trésorerie sur ${n} mois : de ${euro(series[0].endBalance)} (${series[0].label}) à ${euro(lastVal)} (${series[n - 1].label}).`;
 
   return (
-    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)}>
+    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
       <div className="relative h-44 pl-12">
         {/* Repères d'axe Y (libellés HTML, nets) */}
         {ticks.map((t, i) => (
@@ -385,9 +382,13 @@ function FluxBarsChart({ series }: { series: SeriePoint[] }) {
 
   const nets = series.map((s) => s.inflow + s.outflow);
   const niceMax = niceCeil(Math.max(1, ...nets.map(Math.abs)));
+  const totalIn = series.reduce((s, m) => s + m.inflow, 0);
+  const totalOut = series.reduce((s, m) => s + m.outflow, 0);
+  const pos = nets.filter((v) => v > 0).length;
+  const ariaLabel = `Flux nets mensuels sur ${n} mois : ${pos} mois positifs, ${n - pos} négatifs ou nuls ; entrées totales ${euro(totalIn)}, sorties totales ${euro(totalOut)}, net ${euro(totalIn + totalOut)}.`;
 
   return (
-    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)}>
+    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
       <div className="relative h-44">
         {/* Demi-hauteur positive (les colonnes prennent toute la hauteur → les % de barre se résolvent) */}
         <div className="flex h-1/2 gap-1.5">

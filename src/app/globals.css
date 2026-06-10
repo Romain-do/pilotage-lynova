@@ -28,6 +28,16 @@
 
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
+
+  /* Couleurs de marque tierces (source unique) — liens/cartes Evoliz, Revolut, Leaya */
+  --color-evoliz: #23344d; /* bleu nuit Evoliz */
+  --color-revolut: #0a0a0a; /* noir Revolut */
+  --color-banana: #ffd43b; /* jaune banane (accent Evoliz) */
+  --color-leaya: #fbf7f2; /* fond crème Leaya */
+  --color-leaya-border: #ede3d5; /* bordure beige Leaya */
+  --color-leaya-gold: #b8935f; /* doré Leaya (libellés) */
+  --color-leaya-ink: #7a5a33; /* brun foncé Leaya (valeurs) */
+  --color-leaya-badge: #f1e7d8; /* fond badge Leaya */
 }
 
 body {

@@ -100,16 +100,14 @@ export function Cockpit({
             <nav className="flex flex-wrap gap-2">
               {/* Evoliz — lien Facturation, style Evoliz (bleu nuit + accent jaune banane) */}
               <Link href="/facturation"
-                className="inline-flex items-center gap-2 rounded-card px-3.5 py-2 text-sm font-medium text-white shadow-card transition hover:brightness-110"
-                style={{ backgroundColor: "#23344D" }}>
-                <IconCoin size={16} stroke={2} style={{ color: "#FFD43B" }} />
+                className="inline-flex items-center gap-2 rounded-card bg-evoliz px-3.5 py-2 text-sm font-medium text-white shadow-card transition hover:brightness-110">
+                <IconCoin size={16} stroke={2} className="text-banana" />
                 Evoliz
-                <IconChevronRight size={14} style={{ color: "#FFD43B" }} />
+                <IconChevronRight size={14} className="text-banana" />
               </Link>
               {/* Revolut Business — lien Trésorerie, style Revolut (noir minimaliste) */}
               <Link href="/tresorerie"
-                className="inline-flex items-center gap-2 rounded-card px-3.5 py-2 text-sm text-white shadow-card transition hover:brightness-150"
-                style={{ backgroundColor: "#0A0A0A" }}>
+                className="inline-flex items-center gap-2 rounded-card bg-revolut px-3.5 py-2 text-sm text-white shadow-card transition hover:brightness-150">
                 <IconWallet size={16} stroke={2} />
                 <span><span className="font-bold">Revolut</span> <span className="font-normal">Business</span></span>
                 <IconChevronRight size={14} className="opacity-60" />

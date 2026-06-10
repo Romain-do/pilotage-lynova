@@ -132,7 +132,7 @@ export function Facturation({
 
       {/* ───────── KPI principaux ───────── */}
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA HT" value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} />
+        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} />
         <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge commerciale" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)} />
         <MargeNetteCard
           hasBank={hasBank}
@@ -391,8 +391,10 @@ function MonthlyChart({ months, abo, install, achats }: { months: { key: string;
   const ca = months.map((_, i) => abo[i] + install[i]);
   const max = Math.max(1, ...ca, ...achats);
   const n = months.length;
+  const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
+  const ariaLabel = `CA vs achats mensuels HT sur ${n} mois : CA total ${euro(sum(ca))} (abonnement ${euro(sum(abo))}, installation ${euro(sum(install))}), achats total ${euro(sum(achats))}.`;
   return (
-    <div className="relative mt-3" onMouseLeave={() => setHover(null)}>
+    <div className="relative mt-3" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
       <div className="flex h-48 items-end gap-1 sm:gap-1.5">
         {months.map((m, i) => {
           const active = hover === null || hover === i;
@@ -495,7 +497,9 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
       <h2 className="text-sm font-semibold text-ink">Répartition CA &amp; achats</h2>
       <div className="mt-3 flex items-center gap-4">
         <div className="relative h-28 w-28 flex-none">
-          <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90">
+          <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90" role="img"
+            aria-label={`Répartition du CA HT : ${euro(stats.caHtTotal)} au total — abonnements ${euro(stats.aboHt)} (${Math.round(aboPct * 100)} %), installations ${euro(stats.installHt)} (${Math.round((1 - aboPct) * 100)} %). Achats ${euro(stats.achatsHt)}, marge ${euro(stats.marge)}.`}>
+            <title>Répartition du CA HT (abonnements / installations) et achats / marge</title>
             <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-line)" strokeWidth="14" />
             <circle cx="64" cy="64" r={r} fill="none" className="text-cyan transition-[stroke-width] duration-200" stroke="currentColor"
               strokeWidth={hover === "abo" ? 18 : 14} strokeDasharray={`${aboLen} ${c - aboLen}`}
