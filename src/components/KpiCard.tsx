@@ -24,18 +24,20 @@ export function KpiCard({
         <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
       </div>
       <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
-      <div className="mt-1.5 min-h-4 text-xs">
-        {delta == null ? (
-          <span className="text-ink-3">{foot ?? `${deltaLabel} : —`}</span>
-        ) : (
+      <div className="mt-1.5 min-h-4 space-y-1 text-xs">
+        {delta != null ? (
           <span className="inline-flex items-center gap-1">
             <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
               {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
               {Math.abs(delta).toFixed(1)} {deltaUnit}
             </span>
-            <span className="text-ink-3">{deltaLabel}</span>
+            {deltaLabel && <span className="text-ink-3">{deltaLabel}</span>}
           </span>
+        ) : (
+          // Ni delta, ni foot → placeholder discret ; si un foot est fourni, on l'affiche à la place.
+          !foot && <span className="text-ink-3">{deltaLabel} : —</span>
         )}
+        {foot && <div className="text-ink-3">{foot}</div>}
       </div>
     </div>
   );

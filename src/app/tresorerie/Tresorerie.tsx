@@ -34,6 +34,7 @@ import {
   type CryptoPnl,
   type TCatRow,
 } from "@/lib/tresorerie";
+import { KpiCard } from "@/components/KpiCard";
 import { RefreshButton } from "@/components/RefreshButton";
 
 interface Data {
@@ -115,11 +116,11 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
               <span>Du</span>
               <input type="date" defaultValue={period.kind === "custom" ? period.start : ""}
                 onChange={(e) => e.target.value && setPeriod({ kind: "custom", start: e.target.value, end: period.kind === "custom" ? period.end : todayISO })}
-                className="rounded-md border border-line bg-white px-2 py-1 text-ink focus:border-cyan focus:outline-none" />
+                className="rounded-md border border-line bg-white px-2 py-1 text-ink focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40" />
               <span>au</span>
               <input type="date" defaultValue={period.kind === "custom" ? period.end : todayISO}
                 onChange={(e) => e.target.value && setPeriod({ kind: "custom", start: period.kind === "custom" ? period.start : range.start, end: e.target.value })}
-                className="rounded-md border border-line bg-white px-2 py-1 text-ink focus:border-cyan focus:outline-none" />
+                className="rounded-md border border-line bg-white px-2 py-1 text-ink focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40" />
             </div>
           )}
         </div>
@@ -185,32 +186,6 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
   );
 }
 
-/* ───────────── KPI ───────────── */
-function KpiCard({ icon, tint, label, value, delta, deltaLabel = "Vs N-1", foot }: {
-  icon: React.ReactNode; tint: string; label: string; value: string; delta?: number | null; deltaLabel?: string; foot?: string;
-}) {
-  return (
-    <div className="group rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
-      <div className="flex items-center gap-2">
-        <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
-        <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
-      </div>
-      <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{value}</div>
-      <div className="mt-1.5 space-y-1 text-xs">
-        {delta != null && (
-          <span className="inline-flex items-center gap-1">
-            <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-              {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {Math.abs(delta).toFixed(1)} %
-            </span>
-            {deltaLabel && <span className="text-ink-3">{deltaLabel}</span>}
-          </span>
-        )}
-        {foot && <div className="text-ink-3">{foot}</div>}
-      </div>
-    </div>
-  );
-}
 
 /* ───────────── Carte Leaya (gabarit KPI, style maison Leaya) ───────────── */
 function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
@@ -493,7 +468,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: TCatRow[]; onPick: (c: TCat
         const pct = total > 0 ? (c.amount / total) * 100 : 0;
         return (
           <button key={c.label} type="button" onClick={() => onPick(c)}
-            className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none">
+            className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className="truncate text-ink-2">{c.label}</span>
               <span className="flex-none font-medium text-ink">{euro(c.amount)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span></span>

@@ -36,6 +36,7 @@ import {
   type CatRow,
 } from "@/lib/facturation";
 import { netChargesInRange, earliestOutflowDate, type OutflowRow } from "@/lib/tresorerie";
+import { KpiCard } from "@/components/KpiCard";
 import { RefreshButton } from "@/components/RefreshButton";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -309,36 +310,6 @@ function Toolbar({
 }
 
 /* ───────────────────────── KPI & stats ───────────────────────── */
-
-function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%", muted = false,
-}: {
-  icon: React.ReactNode; tint: string; label: string; value: string;
-  delta?: number | null; deltaUnit?: string; muted?: boolean;
-}) {
-  return (
-    <div className="group rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
-      <div className="flex items-center gap-2">
-        <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
-        <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
-      </div>
-      <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
-      <div className="mt-1.5 min-h-4 text-xs">
-        {delta == null ? (
-          <span className="text-ink-3">Vs N-1 : —</span>
-        ) : (
-          <span className="inline-flex items-center gap-1">
-            <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-              {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {Math.abs(delta).toFixed(1)} {deltaUnit}
-            </span>
-            <span className="text-ink-3">Vs N-1</span>
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // Carte « Marge nette (approchée) » = CA HT − achats Evoliz − (rémunération + loyer + électricité
 // captés via Revolut). Grise et explicite si la plage précède les données bancaires (nov. 2024).
@@ -614,7 +585,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: CatRow[]; onPick: (c: CatRo
         const isSans = c.label === "(sans catégorie)";
         return (
           <button key={c.label} type="button" onClick={() => onPick(c)}
-            className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none">
+            className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className={`truncate ${isSans ? "italic text-ink-3" : "text-ink-2"}`}>{c.label}</span>
               <span className="flex-none font-medium text-ink">{euro(c.ht)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span></span>

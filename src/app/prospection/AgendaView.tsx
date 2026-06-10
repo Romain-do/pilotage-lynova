@@ -180,7 +180,7 @@ function Item({
                         setReporting(false);
                       }
                     }}
-                    className="mt-1 w-full rounded-md border border-navy/15 px-2 py-1 text-sm text-navy focus:border-cyan focus:outline-none"
+                    className="mt-1 w-full rounded-md border border-navy/15 px-2 py-1 text-sm text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
                   />
                 </label>
               </div>
