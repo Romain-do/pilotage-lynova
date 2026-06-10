@@ -18,10 +18,12 @@ import {
   compareAsOf,
   computeMRR,
   computeClients,
+  fyMonthIndex,
   FY_MONTH_LABELS,
   type FactDoc,
   type TypeFilter,
 } from "@/lib/facturation";
+import { IconChartBar } from "@tabler/icons-react";
 import { refreshEvoliz } from "./actions";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -54,6 +56,10 @@ export function Facturation({
     () => [...clients].sort((a, b) => (clientSort === "ca" ? b.ca - a.ca : b.aboHt - a.aboHt)).slice(0, 12),
     [clients, clientSort]
   );
+
+  // Mois écoulés dans l'exercice (jusqu'à fin du mois courant) ; CA moyen / mois.
+  const elapsedMonths = cmp.partial ? fyMonthIndex(todayISO) + 1 : 12;
+  const avgPerMonth = stats.caHt / elapsedMonths;
 
   return (
     <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
@@ -98,14 +104,22 @@ export function Facturation({
       </div>
 
       {/* KPIs */}
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard
           icon={<IconCoin size={18} stroke={2} />}
           tint="bg-cyan/15 text-cyan-600"
           label={`CA HT ${cmp.partial ? "à date" : "exercice"}`}
           value={euro(stats.caHt)}
           delta={cmp.pct}
-          deltaHint={`vs N-1 à date · ${euro(cmp.caPrev)}`}
+          deltaHint="Vs N-1"
+        />
+        <KpiCard
+          icon={<IconChartBar size={18} stroke={2} />}
+          tint="bg-cyan/15 text-cyan-600"
+          label="CA HT moyen / mois"
+          value={euro(avgPerMonth)}
+          delta={cmp.pct}
+          deltaHint="Vs N-1"
         />
         <KpiCard
           icon={<IconRepeat size={18} stroke={2} />}
@@ -133,17 +147,25 @@ export function Facturation({
       {/* Graphiques */}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="rounded-card border border-line bg-white p-5 shadow-card lg:col-span-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold text-ink">CA mensuel HT</h2>
               <p className="text-xs text-ink-3">Exercice {fy} vs {fy - 1} · axe oct → sept</p>
             </div>
-            <div className="flex items-center gap-3 text-xs text-ink-2">
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> {fy}</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-navy/20" /> {fy - 1}</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Abonnement</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan/45" /> Installation</span>
+              <span className="text-ink-3">· {fy} cyan / {fy - 1} gris</span>
             </div>
           </div>
-          <MonthlyChart current={stats.monthly} prev={prev.monthly} fyCur={fy} fyPrev={fy - 1} />
+          <MonthlyChart
+            curAbo={stats.monthlyAbo}
+            curInstall={stats.monthlyInstall}
+            prevAbo={prev.monthlyAbo}
+            prevInstall={prev.monthlyInstall}
+            fyCur={fy}
+            fyPrev={fy - 1}
+          />
         </div>
 
         <div className="rounded-card border border-line bg-white p-5 shadow-card">
@@ -238,18 +260,24 @@ function KpiCard({
 /* ─────────────────────── Graphique mensuel ─────────────────────── */
 
 function MonthlyChart({
-  current,
-  prev,
+  curAbo,
+  curInstall,
+  prevAbo,
+  prevInstall,
   fyCur,
   fyPrev,
 }: {
-  current: number[];
-  prev: number[];
+  curAbo: number[];
+  curInstall: number[];
+  prevAbo: number[];
+  prevInstall: number[];
   fyCur: number;
   fyPrev: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...current.map((v) => Math.abs(v)), ...prev.map((v) => Math.abs(v)));
+  const curTot = curAbo.map((v, i) => v + curInstall[i]);
+  const prevTot = prevAbo.map((v, i) => v + prevInstall[i]);
+  const max = Math.max(1, ...curTot, ...prevTot);
 
   return (
     <div className="relative mt-4" onMouseLeave={() => setHover(null)}>
@@ -268,8 +296,8 @@ function MonthlyChart({
                 }`}
               />
               <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-6">
-                <BarV value={prev[i]} max={max} idx={i} base="bg-navy/20" dim={!active} />
-                <BarV value={current[i]} max={max} idx={i} base="bg-cyan" dim={!active} />
+                <StackBar abo={prevAbo[i]} install={prevInstall[i]} max={max} idx={i} aboColor="bg-navy/30" installColor="bg-navy/15" dim={!active} />
+                <StackBar abo={curAbo[i]} install={curInstall[i]} max={max} idx={i} aboColor="bg-cyan" installColor="bg-cyan/45" dim={!active} />
               </div>
               <span
                 className={`absolute bottom-0 text-[10px] transition-colors ${
@@ -287,8 +315,10 @@ function MonthlyChart({
         <ChartTooltip
           index={hover}
           month={FY_MONTH_LABELS[hover]}
-          cur={current[hover]}
-          prev={prev[hover]}
+          curAbo={curAbo[hover]}
+          curInstall={curInstall[hover]}
+          prevAbo={prevAbo[hover]}
+          prevInstall={prevInstall[hover]}
           fyCur={fyCur}
           fyPrev={fyPrev}
         />
@@ -297,63 +327,93 @@ function MonthlyChart({
   );
 }
 
-function BarV({
-  value,
+function StackBar({
+  abo,
+  install,
   max,
   idx,
-  base,
+  aboColor,
+  installColor,
   dim,
 }: {
-  value: number;
+  abo: number;
+  install: number;
   max: number;
   idx: number;
-  base: string;
+  aboColor: string;
+  installColor: string;
   dim: boolean;
 }) {
-  const h = Math.min(100, (Math.abs(value) / max) * 100);
-  const negative = value < 0;
+  const total = abo + install;
+  const hPct = Math.min(100, (total / max) * 100);
+  const installInner = total > 0 ? (install / total) * 100 : 0;
+  const aboInner = total > 0 ? (abo / total) * 100 : 0;
   return (
     <div
-      className={`w-2.5 origin-bottom rounded-t-md transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-3 ${
-        negative ? "bg-red-400" : base
-      } ${dim ? "opacity-40" : "opacity-100"}`}
-      style={{ height: `${h}%`, animationDelay: `${idx * 25}ms` }}
-    />
+      className={`w-2.5 origin-bottom overflow-hidden rounded-t-md transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-3 ${
+        dim ? "opacity-40" : "opacity-100"
+      }`}
+      style={{ height: `${hPct}%`, animationDelay: `${idx * 25}ms` }}
+    >
+      <div className={installColor} style={{ height: `${installInner}%` }} />
+      <div className={aboColor} style={{ height: `${aboInner}%` }} />
+    </div>
   );
 }
 
 function ChartTooltip({
   index,
   month,
-  cur,
-  prev,
+  curAbo,
+  curInstall,
+  prevAbo,
+  prevInstall,
   fyCur,
   fyPrev,
 }: {
   index: number;
   month: string;
-  cur: number;
-  prev: number;
+  curAbo: number;
+  curInstall: number;
+  prevAbo: number;
+  prevInstall: number;
   fyCur: number;
   fyPrev: number;
 }) {
-  const diff = cur - prev;
-  const pct = prev !== 0 ? (diff / prev) * 100 : null;
+  const curTot = curAbo + curInstall;
+  const prevTot = prevAbo + prevInstall;
+  const diff = curTot - prevTot;
+  const pct = prevTot !== 0 ? (diff / prevTot) * 100 : null;
   const left = ((index + 0.5) / 12) * 100;
   const alignRight = index >= 8;
   return (
     <div
-      className="pointer-events-none absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover"
+      className="pointer-events-none absolute top-0 z-10 w-56 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover"
       style={{ left: `${left}%`, ...(alignRight ? { transform: "translateX(-85%)" } : {}) }}
     >
       <div className="font-semibold text-ink">{month}.</div>
-      <div className="mt-2 space-y-1">
-        <Row label={`Exercice ${fyCur}`} value={euro(cur)} dot="bg-cyan" />
-        <Row label={`Exercice ${fyPrev}`} value={euro(prev)} dot="bg-navy/20" />
+
+      <div className="mt-2">
+        <div className="mb-1 flex items-center gap-1.5 font-medium text-ink">
+          <span className="h-2 w-2 rounded-sm bg-cyan" /> Exercice {fyCur}
+        </div>
+        <Row label="Abonnement" value={euro(curAbo)} />
+        <Row label="Installation" value={euro(curInstall)} />
+        <Row label="Total" value={euro(curTot)} strong />
       </div>
+
+      <div className="mt-2 border-t border-line pt-1.5">
+        <div className="mb-1 flex items-center gap-1.5 font-medium text-ink-2">
+          <span className="h-2 w-2 rounded-sm bg-navy/30" /> Exercice {fyPrev}
+        </div>
+        <Row label="Abonnement" value={euro(prevAbo)} />
+        <Row label="Installation" value={euro(prevInstall)} />
+        <Row label="Total" value={euro(prevTot)} strong />
+      </div>
+
       <div className="mt-2 border-t border-line pt-1.5">
         {pct === null ? (
-          <span className="text-ink-3">N-1 : —</span>
+          <span className="text-ink-3">Écart N-1 : —</span>
         ) : (
           <span className={diff >= 0 ? "text-emerald-700" : "text-red-700"}>
             {diff >= 0 ? "▲" : "▼"} {euro(Math.abs(diff))} ({Math.abs(pct).toFixed(0)} %)
@@ -364,12 +424,11 @@ function ChartTooltip({
   );
 }
 
-function Row({ label, value, dot }: { label: string; value: string; dot: string }) {
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className={`h-2 w-2 rounded-full ${dot}`} />
       <span className="text-ink-2">{label}</span>
-      <span className="ml-auto font-medium text-ink">{value}</span>
+      <span className={`ml-auto ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
     </div>
   );
 }
