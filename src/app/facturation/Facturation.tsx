@@ -36,7 +36,7 @@ import {
   type CatRow,
 } from "@/lib/facturation";
 import { netChargesInRange, earliestOutflowDate, type OutflowRow } from "@/lib/tresorerie";
-import { SyncButtons } from "@/components/SyncButtons";
+import { RefreshButton } from "@/components/RefreshButton";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
   { key: "all", label: "Tout" },
@@ -283,7 +283,7 @@ function Toolbar({
           ))}
         </div>
 
-        <SyncButtons initialLastSync={lastSync} />
+        <RefreshButton initialLastSync={lastSync} />
       </div>
 
       {customOpen && (

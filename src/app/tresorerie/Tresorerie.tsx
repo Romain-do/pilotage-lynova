@@ -34,7 +34,7 @@ import {
   type CryptoPnl,
   type TCatRow,
 } from "@/lib/tresorerie";
-import { SyncButtons } from "@/components/SyncButtons";
+import { RefreshButton } from "@/components/RefreshButton";
 
 interface Data {
   accounts: TAccount[];
@@ -108,7 +108,7 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
                 Perso
               </button>
             </div>
-            <SyncButtons initialLastSync={data.lastSync} />
+            <RefreshButton initialLastSync={data.lastSync} />
           </div>
           {customOpen && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">

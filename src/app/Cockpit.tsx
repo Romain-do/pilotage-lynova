@@ -19,7 +19,7 @@ import {
 } from "@tabler/icons-react";
 import { Logo } from "@/components/Logo";
 import { KpiCard } from "@/components/KpiCard";
-import { SyncButtons } from "@/components/SyncButtons";
+import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
 
 export interface CockpitData {
@@ -44,12 +44,6 @@ export interface CockpitData {
   };
   alerts: { tone: "danger" | "warn" | "info"; text: string; href: string }[];
 }
-
-const QUICK = [
-  { href: "/facturation", label: "Facturation", Icon: IconCoin },
-  { href: "/tresorerie", label: "Trésorerie", Icon: IconWallet },
-  { href: "/prospection", label: "Prospection", Icon: IconUsers },
-];
 
 const ALERT_TONE: Record<string, string> = {
   danger: "border-red-200 bg-red-50 text-red-700",
@@ -104,16 +98,31 @@ export function Cockpit({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <nav className="flex flex-wrap gap-2">
-              {QUICK.map(({ href, label, Icon }) => (
-                <Link key={href} href={href}
-                  className="inline-flex items-center gap-2 rounded-card border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink shadow-card transition-all hover:border-cyan/60 hover:shadow-card-hover">
-                  <Icon size={16} stroke={2} className="text-cyan-600" />
-                  {label}
-                  <IconChevronRight size={14} className="text-ink-3" />
-                </Link>
-              ))}
+              {/* Evoliz — lien Facturation, style Evoliz (bleu nuit + accent jaune banane) */}
+              <Link href="/facturation"
+                className="inline-flex items-center gap-2 rounded-card px-3.5 py-2 text-sm font-medium text-white shadow-card transition hover:brightness-110"
+                style={{ backgroundColor: "#23344D" }}>
+                <IconCoin size={16} stroke={2} style={{ color: "#FFD43B" }} />
+                Evoliz
+                <IconChevronRight size={14} style={{ color: "#FFD43B" }} />
+              </Link>
+              {/* Revolut Business — lien Trésorerie, style Revolut (noir minimaliste) */}
+              <Link href="/tresorerie"
+                className="inline-flex items-center gap-2 rounded-card px-3.5 py-2 text-sm text-white shadow-card transition hover:brightness-150"
+                style={{ backgroundColor: "#0A0A0A" }}>
+                <IconWallet size={16} stroke={2} />
+                <span><span className="font-bold">Revolut</span> <span className="font-normal">Business</span></span>
+                <IconChevronRight size={14} className="opacity-60" />
+              </Link>
+              {/* Prospection — style Lynova inchangé */}
+              <Link href="/prospection"
+                className="inline-flex items-center gap-2 rounded-card border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink shadow-card transition-all hover:border-cyan/60 hover:shadow-card-hover">
+                <IconUsers size={16} stroke={2} className="text-cyan-600" />
+                Prospection
+                <IconChevronRight size={14} className="text-ink-3" />
+              </Link>
             </nav>
-            <SyncButtons initialLastSync={data.lastSync} />
+            <RefreshButton initialLastSync={data.lastSync} />
           </div>
         </div>
 
