@@ -10,6 +10,8 @@ import { createStarterPipeline } from "./actions";
 
 // Prospection native (§6) — accessible aux deux rôles.
 export const dynamic = "force-dynamic";
+// La synchro manuelle (refreshAll, DIRIGEANT) s'exécute dans cette route → marge anti-timeout.
+export const maxDuration = 60;
 
 export default async function ProspectionPage({
   searchParams,

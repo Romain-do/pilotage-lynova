@@ -22,9 +22,14 @@ export function RefreshButton({ initialLastSync }: { initialLastSync: string | n
   function run() {
     setMsg(null);
     start(async () => {
-      const r = await refreshAll();
-      setMsg({ ok: r.ok, text: r.message });
-      if (r.ok && r.lastSync) setLastSync(r.lastSync);
+      try {
+        const r = await refreshAll();
+        setMsg({ ok: r.ok, text: r.message });
+        if (r.ok && r.lastSync) setLastSync(r.lastSync);
+      } catch {
+        // Erreur réseau / timeout : message propre, pas de plantage de page.
+        setMsg({ ok: false, text: "Échec de la synchronisation. Réessayez." });
+      }
       setTimeout(() => setMsg(null), 6000);
     });
   }

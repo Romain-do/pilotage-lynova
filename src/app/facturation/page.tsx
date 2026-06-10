@@ -9,6 +9,8 @@ import { Facturation } from "./Facturation";
 
 // Vue Facturation (§5) — réservée au DIRIGEANT (donnée financière, §3).
 export const dynamic = "force-dynamic";
+// La synchro manuelle (refreshAll) s'exécute dans cette route → marge anti-timeout.
+export const maxDuration = 60;
 
 export default async function FacturationPage() {
   await requireDirigeant();

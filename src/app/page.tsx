@@ -29,6 +29,8 @@ import { Cockpit, type CockpitData } from "./Cockpit";
 // Accueil = Cockpit (§9.7) pour le DIRIGEANT. Le COMMERCIAL est redirigé vers la prospection.
 // Dépend de la session (cookies) → jamais de cache statique.
 export const dynamic = "force-dynamic";
+// La synchro manuelle (refreshAll) s'exécute dans cette route → marge anti-timeout.
+export const maxDuration = 60;
 
 export default async function Home() {
   if (!isSupabaseConfigured()) return <NotConfigured />;

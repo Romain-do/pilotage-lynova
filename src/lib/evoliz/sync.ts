@@ -2,11 +2,14 @@
 // Récupère TOUT l'historique (period=custom + date_min/date_max), pagine, et
 // upsert dans la table evoliz_document. Réutilisable par script ou server action.
 
+import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { createEvolizClient, EvolizApiError, type EvolizClient, type ListResponse } from "./client";
 
 // Historique : on remonte large (l'API exige une borne basse avec period=custom).
 const HISTORY_START = "2015-01-01";
+// Taille des lots createMany (sous la limite de paramètres Postgres).
+const CHUNK = 1000;
 
 // Noms de ressource possibles pour les avoirs selon les versions de l'API.
 const CREDIT_RESOURCES = ["credits", "creditnotes", "credit-notes"];
@@ -52,27 +55,38 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const PER_PAGE = 100; // max accepté par l'API Evoliz (per_page=1000 → 400)
+const FETCH_CONCURRENCY = 5; // pages en parallèle (compromis vitesse / rate-limit)
+
+/** Exécute `fn` sur les items avec une concurrence bornée, en préservant l'ordre. */
+async function mapLimit<I, O>(items: I[], limit: number, fn: (item: I) => Promise<O>): Promise<O[]> {
+  const out: O[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 async function fetchAll(
   client: EvolizClient,
   resource: string,
   dateMin: string,
   dateMax: string
 ): Promise<Record<string, unknown>[]> {
-  const all: Record<string, unknown>[] = [];
-  let page = 1;
-  for (;;) {
-    const res = await client.get<ListResponse>(resource, {
-      period: "custom",
-      date_min: dateMin,
-      date_max: dateMax,
-      page,
-      per_page: 100,
-    });
-    const items = res.data ?? [];
-    all.push(...items);
-    const last = res.meta?.last_page ?? page;
-    if (items.length === 0 || page >= last) break;
-    page++;
+  const params = (page: number) => ({ period: "custom", date_min: dateMin, date_max: dateMax, page, per_page: PER_PAGE });
+  // Page 1 d'abord (réchauffe le token, donne le nombre de pages), puis le reste EN PARALLÈLE.
+  const first = await client.get<ListResponse>(resource, params(1));
+  const all: Record<string, unknown>[] = [...(first.data ?? [])];
+  const last = first.meta?.last_page ?? 1;
+  if (last > 1 && (first.data?.length ?? 0) > 0) {
+    const pages = Array.from({ length: last - 1 }, (_, i) => i + 2);
+    const rest = await mapLimit(pages, FETCH_CONCURRENCY, (p) => client.get<ListResponse>(resource, params(p)));
+    for (const res of rest) all.push(...(res.data ?? []));
   }
   return all;
 }
@@ -141,8 +155,12 @@ export async function syncEvoliz(prisma: PrismaClient): Promise<EvolizSyncSummar
   const client = createEvolizClient();
   const dateMax = todayISO();
 
-  const invoices = await fetchAll(client, "invoices", HISTORY_START, dateMax);
-  const { resource: creditResource, items: credits } = await fetchCredits(client, HISTORY_START, dateMax);
+  // Factures et avoirs en parallèle (deux ressources indépendantes).
+  const [invoices, creditsRes] = await Promise.all([
+    fetchAll(client, "invoices", HISTORY_START, dateMax),
+    fetchCredits(client, HISTORY_START, dateMax),
+  ]);
+  const { resource: creditResource, items: credits } = creditsRes;
 
   const records = [
     ...invoices.map((i) => mapDoc("INVOICE", i)),
@@ -166,14 +184,13 @@ export async function syncEvoliz(prisma: PrismaClient): Promise<EvolizSyncSummar
     }
   }
 
-  // Upsert document par document (clé unique kind+evolizId).
-  for (const r of records) {
-    await prisma.evolizDocument.upsert({
-      where: { kind_evolizId: { kind: r.kind, evolizId: r.evolizId } },
-      update: r,
-      create: r,
-    });
+  // Réécriture groupée (balayage complet) : deleteMany + createMany par lots, en une
+  // transaction. Capte les modifications de documents existants et re-catégorisations.
+  const docOps = [prisma.evolizDocument.deleteMany({})];
+  for (let i = 0; i < records.length; i += CHUNK) {
+    docOps.push(prisma.evolizDocument.createMany({ data: records.slice(i, i + CHUNK) }));
   }
+  await prisma.$transaction(docOps);
 
   const invoiceRecs = records.filter((r) => r.kind === "INVOICE");
   const creditRecs = records.filter((r) => r.kind === "CREDIT");
@@ -268,15 +285,20 @@ export async function syncEvolizBuys(prisma: PrismaClient): Promise<BuysSyncSumm
   const dateMax = todayISO();
   const buys = await fetchAll(client, "buys", HISTORY_START, dateMax);
 
-  // Cache reconstruit à chaque synchro (source unique en lecture seule).
-  await prisma.evolizBuyItem.deleteMany({});
-  await prisma.evolizBuy.deleteMany({});
-
   let buysIncluded = 0;
   let itemsFallback = 0;
   let totalHt = 0;
   const dates: number[] = [];
   const seen = new Set<number>();
+
+  // Lignes préparées en mémoire ; UUID des achats générés côté app pour relier les items
+  // (deux createMany : parents puis enfants), au lieu d'un create imbriqué par achat.
+  const buyRows: {
+    id: string; evolizId: number; documentNumber: string | null; documentDate: Date;
+    supplierId: number | null; supplierName: string | null; totalHt: number;
+    status: string | null; enabled: boolean; included: boolean;
+  }[] = [];
+  const itemRows: { buyId: string; categoryCode: string | null; categoryLabel: string | null; ht: number; fallback: boolean }[] = [];
 
   for (const b of buys) {
     const evolizId = Number(b.buyid);
@@ -322,21 +344,28 @@ export async function syncEvolizBuys(prisma: PrismaClient): Promise<BuysSyncSumm
     }
     dates.push(documentDate.getTime());
 
-    await prisma.evolizBuy.create({
-      data: {
-        evolizId,
-        documentNumber: (b.document_number as string) ?? null,
-        documentDate,
-        supplierId: supplier.supplierid != null ? Number(supplier.supplierid) : null,
-        supplierName: (supplier.name as string) ?? null,
-        totalHt: buyHt,
-        status,
-        enabled,
-        included,
-        items: { create: items },
-      },
+    const id = randomUUID();
+    buyRows.push({
+      id,
+      evolizId,
+      documentNumber: (b.document_number as string) ?? null,
+      documentDate,
+      supplierId: supplier.supplierid != null ? Number(supplier.supplierid) : null,
+      supplierName: (supplier.name as string) ?? null,
+      totalHt: buyHt,
+      status,
+      enabled,
+      included,
     });
+    for (const it of items) itemRows.push({ buyId: id, categoryCode: it.categoryCode, categoryLabel: it.categoryLabel, ht: it.ht, fallback: it.fallback });
   }
+
+  // Réécriture groupée en une transaction : purge (items puis achats, contrainte FK),
+  // puis createMany parents (achats) avant enfants (items).
+  const buyOps = [prisma.evolizBuyItem.deleteMany({}), prisma.evolizBuy.deleteMany({})];
+  for (let i = 0; i < buyRows.length; i += CHUNK) buyOps.push(prisma.evolizBuy.createMany({ data: buyRows.slice(i, i + CHUNK) }));
+  for (let i = 0; i < itemRows.length; i += CHUNK) buyOps.push(prisma.evolizBuyItem.createMany({ data: itemRows.slice(i, i + CHUNK) }));
+  await prisma.$transaction(buyOps);
 
   const summary: BuysSyncSummary = {
     buys: buys.length,

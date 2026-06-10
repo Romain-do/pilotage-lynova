@@ -8,6 +8,8 @@ import { Tresorerie } from "./Tresorerie";
 
 // Vue Trésorerie (§5.4-5.7) — DIRIGEANT seul, lecture seule (cache Revolut).
 export const dynamic = "force-dynamic";
+// La synchro manuelle (refreshAll) s'exécute dans cette route → marge anti-timeout.
+export const maxDuration = 60;
 
 export default async function TresoreriePage() {
   await requireDirigeant();

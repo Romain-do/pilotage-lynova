@@ -9,6 +9,8 @@ import type { PrismaClient } from "@prisma/client";
 import { createRevolutClient, FIAT_CURRENCIES, type RevolutClient } from "./client";
 
 const HISTORY_MONTHS = 24;
+// Taille des lots createMany (sous la limite de paramètres Postgres).
+const CHUNK = 1000;
 
 interface RawTx {
   id: string;
@@ -33,7 +35,8 @@ export interface RevolutSyncSummary {
   fiatEur: number;
   cryptoEur: number;
   totalEur: number;
-  txCount: number;
+  txCount: number; // total en cache après synchro
+  newTx: number; // transactions ajoutées lors de cette synchro (incrémental)
   internalLegs: number;
   exchangeTx: number;
   monthly: { month: string; in: number; out: number }[];
@@ -115,8 +118,12 @@ export async function syncRevolut(prisma: PrismaClient): Promise<RevolutSyncSumm
     });
   }
 
-  // ── Transactions (paginées) ──
-  const fromISO = floorISO(HISTORY_MONTHS);
+  // ── Transactions : INCRÉMENTAL ──
+  // Le passé est immuable : on ne récupère que les transactions postérieures à la
+  // dernière en cache (pas de re-téléchargement ni de suppression de l'historique).
+  // Si le cache est vide, on remonte HISTORY_MONTHS (premier remplissage).
+  const lastTx = await prisma.revolutTx.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  const fromISO = lastTx ? lastTx.createdAt.toISOString() : floorISO(HISTORY_MONTHS);
   const txs = await fetchAllTx(client, fromISO);
 
   // Agrégat mensuel : flux EXTERNES en EUR (hors internes & exchanges).
@@ -188,26 +195,34 @@ export async function syncRevolut(prisma: PrismaClient): Promise<RevolutSyncSumm
     });
   }
 
-  // ── Écriture du cache (reconstruit à chaque synchro) ──
-  await prisma.revolutLeg.deleteMany({});
-  await prisma.revolutTx.deleteMany({});
-  await prisma.revolutAccount.deleteMany({});
+  // ── Écriture du cache ──
+  // N'insère que les transactions RÉELLEMENT nouvelles (la fenêtre incrémentale
+  // re-renvoie la dernière en cache, qu'on écarte). L'historique n'est jamais supprimé.
+  const fetchedIds = txRows.map((r) => r.id);
+  const existingIds = new Set(
+    fetchedIds.length
+      ? (await prisma.revolutTx.findMany({ where: { id: { in: fetchedIds } }, select: { id: true } })).map((e) => e.id)
+      : []
+  );
+  const newTxRows = txRows.filter((r) => !existingIds.has(r.id));
+  const newIds = new Set(newTxRows.map((r) => r.id));
+  const newLegRows = legRows.filter((l) => newIds.has(l.txId));
 
-  for (const a of accountRows) await prisma.revolutAccount.create({ data: a });
-  // Transactions par lots, puis legs par lots (createMany rapide).
-  for (let i = 0; i < txRows.length; i += 500) {
-    await prisma.revolutTx.createMany({ data: txRows.slice(i, i + 500) });
-  }
-  for (let i = 0; i < legRows.length; i += 500) {
-    await prisma.revolutLeg.createMany({ data: legRows.slice(i, i + 500), skipDuplicates: true });
-  }
+  // Comptes rafraîchis (solde + valorisation) ; transactions/jambes nouvelles ajoutées.
+  const ops = [prisma.revolutAccount.deleteMany({}), prisma.revolutAccount.createMany({ data: accountRows })];
+  for (let i = 0; i < newTxRows.length; i += CHUNK) ops.push(prisma.revolutTx.createMany({ data: newTxRows.slice(i, i + CHUNK) }));
+  for (let i = 0; i < newLegRows.length; i += CHUNK) ops.push(prisma.revolutLeg.createMany({ data: newLegRows.slice(i, i + CHUNK) }));
+  await prisma.$transaction(ops);
+
+  const txCount = await prisma.revolutTx.count();
 
   const summary: RevolutSyncSummary = {
     accounts: accountRows.length,
     fiatEur: Math.round(fiatEur * 100) / 100,
     cryptoEur: Math.round(cryptoEur * 100) / 100,
     totalEur: Math.round((fiatEur + cryptoEur) * 100) / 100,
-    txCount: txRows.length,
+    txCount,
+    newTx: newTxRows.length,
     internalLegs,
     exchangeTx,
     monthly: [...monthly.entries()].sort().map(([month, v]) => ({ month, in: v.in, out: v.out })),
