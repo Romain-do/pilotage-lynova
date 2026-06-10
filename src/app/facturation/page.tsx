@@ -35,6 +35,7 @@ export default async function FacturationPage() {
       select: {
         documentDate: true,
         totalHt: true,
+        supplierName: true,
         items: { select: { categoryCode: true, categoryLabel: true, ht: true } },
       },
     }),
@@ -47,6 +48,7 @@ export default async function FacturationPage() {
   const buyItems: BuyItemDoc[] = buyRows.flatMap((b) =>
     b.items.map((it) => ({
       date: b.documentDate.toISOString().slice(0, 10),
+      supplierName: b.supplierName,
       categoryCode: it.categoryCode,
       categoryLabel: it.categoryLabel,
       ht: Number(it.ht),

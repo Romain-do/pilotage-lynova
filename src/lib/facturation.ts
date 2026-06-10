@@ -1,11 +1,13 @@
-// Logique métier Facturation (§5). Fonctions pures (serveur & client).
-// Règles : exercice fiscal 1er oct → 30 sept ; CA en HT (avoirs déduits) ;
-// abonnement HT < 2000 € / installation HT ≥ 2000 € ; HT/TTC stricts.
+// Logique métier Facturation (§5) — basée sur une PLAGE DE DATES [start, end].
+// CA en HT brut (factures validées, avoirs non déduits) ; abonnement < 2000 € /
+// installation ≥ 2000 € ; marge commerciale = CA HT − achats fournisseurs HT ;
+// HT/TTC stricts. Comparaison N-1 = même plage décalée d'un an.
+// Les dates sont des chaînes ISO `yyyy-mm-dd` (comparaison lexicographique = chronologique).
 
 export interface FactDoc {
   kind: "INVOICE" | "CREDIT";
-  date: string; // yyyy-mm-dd
-  ht: number; // magnitude positive
+  date: string;
+  ht: number;
   ttc: number;
   paid: number; // TTC
   netToPay: number; // TTC
@@ -13,62 +15,32 @@ export interface FactDoc {
   clientName: string | null;
 }
 
+export interface BuyDoc {
+  date: string;
+  ht: number;
+}
+export interface BuyItemDoc {
+  date: string;
+  supplierName: string | null;
+  categoryCode: string | null;
+  categoryLabel: string | null;
+  ht: number;
+}
+
 export type TypeFilter = "all" | "abo" | "install";
+export interface DateRange {
+  start: string; // yyyy-mm-dd (inclus)
+  end: string; // yyyy-mm-dd (inclus)
+}
 
 const INSTALL_THRESHOLD = 2000;
-
 export function isInstallation(ht: number): boolean {
   return Math.abs(ht) >= INSTALL_THRESHOLD;
 }
-
-/**
- * Contribution au CA (brut, aligné Evoliz) : seules les factures validées comptent.
- * Les avoirs (commerciaux comme d'annulation) ne sont JAMAIS déduits du CA.
- */
-function signed(d: FactDoc): number {
-  return d.kind === "INVOICE" ? d.ht : 0;
-}
-
 export function matchesType(ht: number, filter: TypeFilter): boolean {
   if (filter === "all") return true;
   return filter === "install" ? isInstallation(ht) : !isInstallation(ht);
 }
-
-// ── Exercice fiscal ──
-
-export function fyOf(dateISO: string): number {
-  const d = new Date(dateISO);
-  return d.getUTCFullYear() + (d.getUTCMonth() >= 9 ? 1 : 0); // octobre = mois 9
-}
-export function fyStart(fy: number): Date {
-  return new Date(Date.UTC(fy - 1, 9, 1, 0, 0, 0));
-}
-export function fyEnd(fy: number): Date {
-  return new Date(Date.UTC(fy, 8, 30, 23, 59, 59));
-}
-export function fyLabel(fy: number): string {
-  return `Exercice ${fy} · oct. ${fy - 1} → sept. ${fy}`;
-}
-/** Index de mois fiscal 0..11 (oct = 0 … sept = 11). */
-export function fyMonthIndex(dateISO: string): number {
-  return (new Date(dateISO).getUTCMonth() - 9 + 12) % 12;
-}
-export const FY_MONTH_LABELS = [
-  "oct", "nov", "déc", "janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept",
-];
-
-const MONTH_NAMES = [
-  "janvier", "février", "mars", "avril", "mai", "juin",
-  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-];
-
-export function listFiscalYears(docs: FactDoc[]): number[] {
-  const set = new Set<number>();
-  for (const d of docs) set.add(fyOf(d.date));
-  return [...set].sort((a, b) => b - a); // plus récent d'abord
-}
-
-// ── Formatage ──
 
 export function euro(n: number, decimals = 0): string {
   return new Intl.NumberFormat("fr-FR", {
@@ -79,245 +51,235 @@ export function euro(n: number, decimals = 0): string {
   }).format(n);
 }
 
-// ── Calculs d'exercice ──
+const MONTH_ABBR = [
+  "janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc",
+];
+const MONTH_FULL = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
 
-export interface ExerciceStats {
-  monthly: number[]; // 12 mois fiscaux, CA HT total
-  monthlyAbo: number[]; // part abonnement par mois fiscal
-  monthlyInstall: number[]; // part installation par mois fiscal
-  caHt: number;
+// ── Exercice fiscal (oct→sept) ──
+export function fyOf(dateISO: string): number {
+  const m = Number(dateISO.slice(5, 7));
+  return Number(dateISO.slice(0, 4)) + (m >= 10 ? 1 : 0);
+}
+export function fyLabel(fy: number): string {
+  return `Exercice ${fy} · oct. ${fy - 1} → sept. ${fy}`;
+}
+export function listFiscalYears(docs: FactDoc[]): number[] {
+  const set = new Set<number>();
+  for (const d of docs) if (d.kind === "INVOICE") set.add(fyOf(d.date));
+  return [...set].sort((a, b) => b - a);
+}
+
+// ── Construction de plages ──
+const pad = (n: number) => String(n).padStart(2, "0");
+function lastDayOfMonth(y: number, m1: number): number {
+  return new Date(Date.UTC(y, m1, 0)).getUTCDate(); // m1 = mois 1-12
+}
+function endOfMonthISO(y: number, m1: number): string {
+  return `${y}-${pad(m1)}-${pad(lastDayOfMonth(y, m1))}`;
+}
+
+/** Plage d'un exercice fiscal ; borné à la fin du mois courant si exercice en cours. */
+export function fyRange(fy: number, todayISO: string): DateRange {
+  const start = `${fy - 1}-10-01`;
+  if (fyOf(todayISO) === fy) {
+    const y = Number(todayISO.slice(0, 4));
+    const m = Number(todayISO.slice(5, 7));
+    return { start, end: endOfMonthISO(y, m) };
+  }
+  return { start, end: `${fy}-09-30` };
+}
+
+export type PresetKey = "current-fy" | "current-month" | "current-quarter" | "last-12-months";
+export function presetRange(key: PresetKey, todayISO: string): DateRange {
+  const y = Number(todayISO.slice(0, 4));
+  const m = Number(todayISO.slice(5, 7));
+  switch (key) {
+    case "current-fy":
+      return fyRange(fyOf(todayISO), todayISO);
+    case "current-month":
+      return { start: `${y}-${pad(m)}-01`, end: endOfMonthISO(y, m) };
+    case "current-quarter": {
+      const q0 = m - ((m - 1) % 3); // premier mois du trimestre civil
+      return { start: `${y}-${pad(q0)}-01`, end: endOfMonthISO(y, q0 + 2) };
+    }
+    case "last-12-months": {
+      let sy = y, sm = m - 11;
+      while (sm <= 0) { sm += 12; sy -= 1; }
+      return { start: `${sy}-${pad(sm)}-01`, end: endOfMonthISO(y, m) };
+    }
+  }
+}
+
+export function presetLabel(key: PresetKey): string {
+  return {
+    "current-fy": "Exercice en cours",
+    "current-month": "Mois en cours",
+    "current-quarter": "Trimestre en cours",
+    "last-12-months": "12 derniers mois",
+  }[key];
+}
+
+/** Même plage décalée d'un an (comparaison N-1). */
+export function shiftYear({ start, end }: DateRange): DateRange {
+  const dec = (iso: string) => `${Number(iso.slice(0, 4)) - 1}${iso.slice(4)}`;
+  return { start: dec(start), end: dec(end) };
+}
+
+/** Libellé court d'une plage (ex. « oct. 2024 → juin 2025 »). */
+export function rangeLabel({ start, end }: DateRange): string {
+  const fmt = (iso: string) => `${MONTH_ABBR[Number(iso.slice(5, 7)) - 1]}. ${iso.slice(0, 4)}`;
+  return `${fmt(start)} → ${fmt(end)}`;
+}
+
+/** Liste des mois civils de la plage (pour l'axe du graphe). */
+export function monthsInRange({ start, end }: DateRange): { key: string; label: string }[] {
+  let y = Number(start.slice(0, 4));
+  let m = Number(start.slice(5, 7));
+  const ey = Number(end.slice(0, 4));
+  const em = Number(end.slice(5, 7));
+  const out: { key: string; label: string }[] = [];
+  while (y < ey || (y === ey && m <= em)) {
+    out.push({ key: `${y}-${pad(m)}`, label: `${MONTH_ABBR[m - 1]} ${String(y).slice(2)}` });
+    m++;
+    if (m > 12) { m = 1; y++; }
+    if (out.length > 60) break; // garde-fou
+  }
+  return out;
+}
+
+const inRange = (d: string, r: DateRange) => d >= r.start && d <= r.end;
+
+// ── Calculs sur une plage ──
+
+export interface RangeStats {
+  caHt: number; // CA filtré (selon le filtre Tout/Abo/Install)
+  caHtTotal: number; // CA toutes typologies (base de la marge)
   aboHt: number;
   installHt: number;
-  encaisseTtc: number; // payé (TTC)
-  resteTtc: number; // restant dû (TTC)
+  achatsHt: number;
+  marge: number; // CA total − achats
+  taux: number | null; // %
+  encaisseTtc: number;
+  resteTtc: number;
   invoiceCount: number;
+  months: { key: string; label: string }[];
+  caByMonth: number[]; // CA total par mois civil
+  achatsByMonth: number[];
 }
 
-function inRange(dateISO: string, start: Date, end: Date): boolean {
-  const t = new Date(dateISO).getTime();
-  return t >= start.getTime() && t <= end.getTime();
-}
-
-export function computeExercice(docs: FactDoc[], fy: number, filter: TypeFilter): ExerciceStats {
-  const start = fyStart(fy);
-  const end = fyEnd(fy);
-  const monthly = new Array(12).fill(0);
-  const monthlyAbo = new Array(12).fill(0);
-  const monthlyInstall = new Array(12).fill(0);
-  let caHt = 0, aboHt = 0, installHt = 0, encaisseTtc = 0, resteTtc = 0, invoiceCount = 0;
+export function computeRange(
+  docs: FactDoc[],
+  buys: BuyDoc[],
+  range: DateRange,
+  filter: TypeFilter
+): RangeStats {
+  const months = monthsInRange(range);
+  const idx = new Map(months.map((m, i) => [m.key, i]));
+  const caByMonth = new Array(months.length).fill(0);
+  const achatsByMonth = new Array(months.length).fill(0);
+  let caHt = 0, caHtTotal = 0, aboHt = 0, installHt = 0, encaisseTtc = 0, resteTtc = 0, invoiceCount = 0, achatsHt = 0;
 
   for (const d of docs) {
-    if (d.kind !== "INVOICE") continue; // CA brut : factures seulement
-    if (!inRange(d.date, start, end) || !matchesType(d.ht, filter)) continue;
-    const v = d.ht;
-    const idx = fyMonthIndex(d.date);
-    caHt += v;
-    monthly[idx] += v;
-    if (isInstallation(d.ht)) {
-      installHt += v;
-      monthlyInstall[idx] += v;
-    } else {
-      aboHt += v;
-      monthlyAbo[idx] += v;
-    }
+    if (d.kind !== "INVOICE" || !inRange(d.date, range)) continue;
+    caHtTotal += d.ht;
+    if (isInstallation(d.ht)) installHt += d.ht;
+    else aboHt += d.ht;
     encaisseTtc += d.paid;
     resteTtc += d.netToPay;
     invoiceCount++;
+    const i = idx.get(d.date.slice(0, 7));
+    if (i != null) caByMonth[i] += d.ht;
+    if (matchesType(d.ht, filter)) caHt += d.ht;
   }
-  return { monthly, monthlyAbo, monthlyInstall, caHt, aboHt, installHt, encaisseTtc, resteTtc, invoiceCount };
-}
-
-// ── Comparaison N-1 « à date » (même fenêtre temporelle) ──
-
-export interface Comparison {
-  caCurrent: number;
-  caPrev: number;
-  pct: number | null;
-  partial: boolean;
-  asOfMonthLabel: string; // mois de la borne (ex. « juin »)
-}
-
-export function compareAsOf(
-  docs: FactDoc[],
-  fy: number,
-  filter: TypeFilter,
-  todayISO: string
-): Comparison {
-  const partial = fyOf(todayISO) === fy;
-  const today = new Date(todayISO);
-
-  // Comparaison « à date » en MOIS ENTIERS : la borne haute est le dernier jour du
-  // mois courant (Date.UTC(y, m+1, 0) = fin de mois), appliquée aux DEUX exercices.
-  let asOf: Date;
-  let asOfPrev: Date;
-  if (partial) {
-    const y = today.getUTCFullYear();
-    const m = today.getUTCMonth();
-    asOf = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59));
-    asOfPrev = new Date(Date.UTC(y - 1, m + 1, 0, 23, 59, 59));
-  } else {
-    asOf = fyEnd(fy);
-    asOfPrev = fyEnd(fy - 1);
+  for (const b of buys) {
+    if (!inRange(b.date, range)) continue;
+    achatsHt += b.ht;
+    const i = idx.get(b.date.slice(0, 7));
+    if (i != null) achatsByMonth[i] += b.ht;
   }
 
-  const sum = (start: Date, end: Date) =>
-    docs.reduce((acc, d) => (inRange(d.date, start, end) && matchesType(d.ht, filter) ? acc + signed(d) : acc), 0);
-
-  const caCurrent = sum(fyStart(fy), asOf);
-  const caPrev = sum(fyStart(fy - 1), asOfPrev);
-  const pct = caPrev !== 0 ? ((caCurrent - caPrev) / caPrev) * 100 : null;
-  return { caCurrent, caPrev, pct, partial, asOfMonthLabel: MONTH_NAMES[asOf.getUTCMonth()] };
-}
-
-// ── MRR : abonnements du dernier mois civil facturé ──
-
-export interface MrrResult {
-  month: string | null; // "YYYY-MM"
-  mrr: number;
-  byClient: { clientName: string; amount: number }[];
-}
-
-export function computeMRR(docs: FactDoc[]): MrrResult {
-  const months = docs.filter((d) => d.kind === "INVOICE").map((d) => d.date.slice(0, 7));
-  if (months.length === 0) return { month: null, mrr: 0, byClient: [] };
-  const month = months.sort().at(-1)!;
-
-  const byClient = new Map<string, number>();
-  let mrr = 0;
-  for (const d of docs) {
-    if (d.date.slice(0, 7) !== month || isInstallation(d.ht)) continue; // abonnements seulement
-    const s = signed(d);
-    mrr += s;
-    const key = d.clientName ?? "—";
-    byClient.set(key, (byClient.get(key) ?? 0) + s);
-  }
+  const marge = caHtTotal - achatsHt;
   return {
-    month,
-    mrr,
-    byClient: [...byClient.entries()]
-      .map(([clientName, amount]) => ({ clientName, amount }))
-      .filter((c) => c.amount !== 0)
-      .sort((a, b) => b.amount - a.amount),
+    caHt,
+    caHtTotal,
+    aboHt,
+    installHt,
+    achatsHt,
+    marge,
+    taux: caHtTotal > 0 ? (marge / caHtTotal) * 100 : null,
+    encaisseTtc,
+    resteTtc,
+    invoiceCount,
+    months,
+    caByMonth,
+    achatsByMonth,
   };
 }
 
-// ── Clients (exercice) ──
+export const rel = (cur: number, prev: number): number | null =>
+  prev !== 0 ? ((cur - prev) / prev) * 100 : null;
 
+// ── MRR (abonnements du dernier mois civil de la plage) ──
+export function monthAbo(docs: FactDoc[], monthKey: string): number {
+  let s = 0;
+  for (const d of docs) {
+    if (d.kind !== "INVOICE" || d.date.slice(0, 7) !== monthKey || isInstallation(d.ht)) continue;
+    s += d.ht;
+  }
+  return s;
+}
+export interface MrrResult {
+  monthKey: string | null;
+  monthLabel: string | null;
+  mrr: number;
+  pct: number | null;
+}
+export function computeMRR(docs: FactDoc[], range: DateRange): MrrResult {
+  const months = monthsInRange(range);
+  const last = months[months.length - 1];
+  if (!last) return { monthKey: null, monthLabel: null, mrr: 0, pct: null };
+  const mrr = monthAbo(docs, last.key);
+  const prevKey = `${Number(last.key.slice(0, 4)) - 1}${last.key.slice(4)}`;
+  const prev = monthAbo(docs, prevKey);
+  const full = MONTH_FULL[Number(last.key.slice(5, 7)) - 1];
+  return { monthKey: last.key, monthLabel: `${full} ${last.key.slice(0, 4)}`, mrr, pct: rel(mrr, prev) };
+}
+
+// ── Clients (installations / abonnements / total) ──
 export interface ClientRow {
   clientName: string;
-  ca: number; // CA HT net exercice
-  aboHt: number; // part abonnement
+  installHt: number;
+  aboHt: number;
+  ca: number;
+}
+export function computeClients(docs: FactDoc[], range: DateRange): ClientRow[] {
+  const map = new Map<string, ClientRow>();
+  for (const d of docs) {
+    if (d.kind !== "INVOICE" || !inRange(d.date, range)) continue;
+    const key = d.clientName ?? "—";
+    const cur = map.get(key) ?? { clientName: key, installHt: 0, aboHt: 0, ca: 0 };
+    cur.ca += d.ht;
+    if (isInstallation(d.ht)) cur.installHt += d.ht;
+    else cur.aboHt += d.ht;
+    map.set(key, cur);
+  }
+  return [...map.values()].filter((c) => c.ca !== 0).sort((a, b) => b.ca - a.ca);
 }
 
-// ── Marge commerciale (CA HT − achats fournisseurs HT) ──
-
-export interface BuyDoc {
-  date: string; // yyyy-mm-dd
-  ht: number;
-}
-export interface BuyItemDoc {
-  date: string; // date de l'achat
-  categoryCode: string | null;
-  categoryLabel: string | null;
-  ht: number;
-}
-
-export interface MargeResult {
-  achatsHt: number; // exercice (à date)
-  marge: number; // CA − achats
-  taux: number | null; // % (marge / CA)
-  monthlyAchats: number[]; // 12 mois fiscaux
-  // Comparaisons N-1 « à date » (mois entiers)
-  achatsPct: number | null;
-  margePct: number | null;
-  tauxDeltaPts: number | null; // écart en points de %
-}
-
+// ── Achats par catégorie + détail (drill-down) ──
 export interface CatRow {
   code: string | null;
   label: string;
   ht: number;
 }
-
-function asOfBounds(fy: number, todayISO: string) {
-  const partial = fyOf(todayISO) === fy;
-  const today = new Date(todayISO);
-  let asOf: Date;
-  let asOfPrev: Date;
-  if (partial) {
-    const y = today.getUTCFullYear();
-    const m = today.getUTCMonth();
-    asOf = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59));
-    asOfPrev = new Date(Date.UTC(y - 1, m + 1, 0, 23, 59, 59));
-  } else {
-    asOf = fyEnd(fy);
-    asOfPrev = fyEnd(fy - 1);
-  }
-  return { start: fyStart(fy), asOf, prevStart: fyStart(fy - 1), asOfPrev };
-}
-
-const rel = (cur: number, prev: number): number | null =>
-  prev !== 0 ? ((cur - prev) / prev) * 100 : null;
-
-/** Achats HT d'un exercice + ventilation mensuelle (oct→sept). */
-export function computeBuys(buys: BuyDoc[], fy: number): { achatsHt: number; monthly: number[] } {
-  const start = fyStart(fy);
-  const end = fyEnd(fy);
-  const monthly = new Array(12).fill(0);
-  let achatsHt = 0;
-  for (const b of buys) {
-    if (!inRange(b.date, start, end)) continue;
-    achatsHt += b.ht;
-    monthly[fyMonthIndex(b.date)] += b.ht;
-  }
-  return { achatsHt, monthly };
-}
-
-/** Marge commerciale = CA HT (toutes typologies) − achats HT, avec comparaisons N-1 à date. */
-export function computeMarge(
-  docs: FactDoc[],
-  buys: BuyDoc[],
-  fy: number,
-  todayISO: string
-): MargeResult {
-  const caHt = computeExercice(docs, fy, "all").caHt;
-  const { achatsHt, monthly } = computeBuys(buys, fy);
-  const marge = caHt - achatsHt;
-  const taux = caHt > 0 ? (marge / caHt) * 100 : null;
-
-  const { start, asOf, prevStart, asOfPrev } = asOfBounds(fy, todayISO);
-  const sumDocs = (s: Date, e: Date) =>
-    docs.reduce((acc, d) => (inRange(d.date, s, e) ? acc + signed(d) : acc), 0);
-  const sumBuys = (s: Date, e: Date) =>
-    buys.reduce((acc, b) => (inRange(b.date, s, e) ? acc + b.ht : acc), 0);
-
-  const caCur = sumDocs(start, asOf);
-  const caPrev = sumDocs(prevStart, asOfPrev);
-  const achCur = sumBuys(start, asOf);
-  const achPrev = sumBuys(prevStart, asOfPrev);
-  const margeCur = caCur - achCur;
-  const margePrev = caPrev - achPrev;
-  const tauxCur = caCur > 0 ? (margeCur / caCur) * 100 : null;
-  const tauxPrev = caPrev > 0 ? (margePrev / caPrev) * 100 : null;
-
-  return {
-    achatsHt,
-    marge,
-    taux,
-    monthlyAchats: monthly,
-    achatsPct: rel(achCur, achPrev),
-    margePct: rel(margeCur, margePrev),
-    tauxDeltaPts: tauxCur !== null && tauxPrev !== null ? tauxCur - tauxPrev : null,
-  };
-}
-
-/** Répartition des achats par catégorie pour un exercice (triée par montant décroissant). */
-export function computeBuyCategories(items: BuyItemDoc[], fy: number): CatRow[] {
-  const start = fyStart(fy);
-  const end = fyEnd(fy);
+export function computeBuyCategories(items: BuyItemDoc[], range: DateRange): CatRow[] {
   const map = new Map<string, CatRow>();
   for (const it of items) {
-    if (!inRange(it.date, start, end)) continue;
+    if (!inRange(it.date, range)) continue;
     const label = it.categoryLabel ?? "(sans catégorie)";
     const key = `${it.categoryCode ?? "—"}|${label}`;
     const cur = map.get(key) ?? { code: it.categoryCode, label, ht: 0 };
@@ -327,21 +289,19 @@ export function computeBuyCategories(items: BuyItemDoc[], fy: number): CatRow[] 
   return [...map.values()].filter((c) => c.ht !== 0).sort((a, b) => b.ht - a.ht);
 }
 
-export function computeClients(docs: FactDoc[], fy: number): ClientRow[] {
-  const start = fyStart(fy);
-  const end = fyEnd(fy);
-  const map = new Map<string, { ca: number; aboHt: number }>();
-  for (const d of docs) {
-    if (!inRange(d.date, start, end)) continue;
-    const key = d.clientName ?? "—";
-    const cur = map.get(key) ?? { ca: 0, aboHt: 0 };
-    const s = signed(d);
-    cur.ca += s;
-    if (!isInstallation(d.ht)) cur.aboHt += s;
-    map.set(key, cur);
-  }
-  return [...map.entries()]
-    .map(([clientName, v]) => ({ clientName, ...v }))
-    .filter((c) => c.ca !== 0 || c.aboHt !== 0)
-    .sort((a, b) => b.ca - a.ca);
+export interface BuyLine {
+  supplierName: string;
+  date: string;
+  ht: number;
+}
+/** Détail des lignes d'achat d'une catégorie sur la plage (tri montant décroissant). */
+export function categoryDetail(items: BuyItemDoc[], range: DateRange, label: string): BuyLine[] {
+  return items
+    .filter((it) => inRange(it.date, range) && (it.categoryLabel ?? "(sans catégorie)") === label)
+    .map((it) => ({ supplierName: it.supplierName ?? "—", date: it.date, ht: it.ht }))
+    .sort((a, b) => b.ht - a.ht);
+}
+
+export function formatDateFR(iso: string): string {
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
