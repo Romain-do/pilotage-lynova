@@ -13,6 +13,7 @@ import {
   presetRange,
   rel,
   euro,
+  caHtByFiscalMonth,
   type FactDoc,
   type BuyDoc,
 } from "@/lib/facturation";
@@ -22,6 +23,7 @@ import {
   flowsInRange,
   netChargesInRange,
   earliestOutflowDate,
+  leayaInRange,
 } from "@/lib/tresorerie";
 import { categoryOf, reminderStatus, formatDateFR, type KpiCategory } from "@/lib/prospection";
 import { Cockpit, type CockpitData } from "./Cockpit";
@@ -99,6 +101,11 @@ async function buildCockpitData(): Promise<CockpitData> {
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
   const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
   const mrr = computeMRR(docs, range);
+  const leaya = leayaInRange(treso.outflows, range);
+  const leayaPrev = leayaInRange(treso.outflows, prevRange);
+  // CA HT mensuel exercice vs N-1 (axe fiscal oct→sept).
+  const caFyCur = caHtByFiscalMonth(docs, fy);
+  const caFyPrev = caHtByFiscalMonth(docs, fy - 1);
 
   // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
   const fiatEur = treso.accounts.filter((a) => a.kind === "FIAT").reduce((s, a) => s + (a.valoEur ?? 0), 0);
@@ -152,7 +159,12 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   return {
     fyLabel: fyLabel(fy),
+    fy,
     lastSync,
+    leaya,
+    leayaPrev,
+    caFyCur,
+    caFyPrev,
     finance: {
       caHt: cur.caHtTotal,
       caDelta: rel(cur.caHtTotal, prev.caHtTotal),
@@ -170,9 +182,6 @@ async function buildCockpitData(): Promise<CockpitData> {
       cashNetMonth,
       cashNetMonthDelta: hasBankMonthPrev ? rel(cashNetMonth, cashNetMonthPrev) : null,
       monthLabel,
-      cryptoPnl: treso.cryptoPnl.pnl,
-      cryptoPct: treso.cryptoPnl.pct,
-      cryptoTransferredOut: treso.cryptoPnl.transferredOutValue,
     },
     prospection: {
       totalProspects: rows.length,

@@ -8,7 +8,6 @@ import {
   IconRepeat,
   IconWallet,
   IconArrowsExchange,
-  IconCurrencyBitcoin,
   IconUsers,
   IconTrophy,
   IconCalendarEvent,
@@ -17,14 +16,21 @@ import {
   IconChevronRight,
   IconExternalLink,
 } from "@tabler/icons-react";
-import { Logo } from "@/components/Logo";
+import { AppNav } from "@/components/AppNav";
 import { KpiCard } from "@/components/KpiCard";
+import { LeayaCard } from "@/components/LeayaCard";
+import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
 
 export interface CockpitData {
   fyLabel: string;
+  fy: number;
   lastSync: string | null;
+  leaya: number;
+  leayaPrev: number;
+  caFyCur: number[];
+  caFyPrev: number[];
   finance: {
     caHt: number; caDelta: number | null;
     margeNette: number; margeNetteDelta: number | null; hasBank: boolean;
@@ -32,7 +38,6 @@ export interface CockpitData {
     mrr: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
     cashNetMonth: number; cashNetMonthDelta: number | null; monthLabel: string;
-    cryptoPnl: number; cryptoPct: number | null; cryptoTransferredOut: number;
   };
   prospection: {
     totalProspects: number;
@@ -66,62 +71,16 @@ export function Cockpit({
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      {/* En-tête */}
-      <header className="bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <Logo className="text-lg text-white" />
-            <span className="text-sm text-white/50">/ Cockpit</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-white/70 sm:inline">{user.email}</span>
-            {user.role === "DIRIGEANT" && (
-              <Link href="/admin" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10">
-                Administration
-              </Link>
-            )}
-            <form action="/auth/signout" method="post">
-              <button type="submit" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10">
-                Se déconnecter
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
+      <AppNav role={user.role} />
 
       <section className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
-        {/* Salutation + accès rapide */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        {/* Salutation + actualiser */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-ink">Bonjour {firstName}</h1>
             <p className="mt-1 text-sm capitalize text-ink-3">{dateLabel}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <nav className="flex flex-wrap gap-2">
-              {/* Evoliz — lien Facturation, style Evoliz (bleu nuit + accent jaune banane) */}
-              <Link href="/facturation"
-                className="inline-flex items-center gap-2 rounded-card bg-evoliz px-3.5 py-2 text-sm font-medium text-white shadow-card transition hover:brightness-110">
-                <IconCoin size={16} stroke={2} className="text-banana" />
-                Evoliz
-                <IconChevronRight size={14} className="text-banana" />
-              </Link>
-              {/* Revolut Business — lien Trésorerie, style Revolut (noir minimaliste) */}
-              <Link href="/tresorerie"
-                className="inline-flex items-center gap-2 rounded-card bg-revolut px-3.5 py-2 text-sm text-white shadow-card transition hover:brightness-150">
-                <IconWallet size={16} stroke={2} />
-                <span><span className="font-bold">Revolut</span> <span className="font-normal">Business</span></span>
-                <IconChevronRight size={14} className="opacity-60" />
-              </Link>
-              {/* Prospection — style Lynova inchangé */}
-              <Link href="/prospection"
-                className="inline-flex items-center gap-2 rounded-card border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink shadow-card transition-all hover:border-cyan/60 hover:shadow-card-hover">
-                <IconUsers size={16} stroke={2} className="text-cyan-600" />
-                Prospection
-                <IconChevronRight size={14} className="text-ink-3" />
-              </Link>
-            </nav>
-            <RefreshButton initialLastSync={data.lastSync} />
-          </div>
+          <RefreshButton initialLastSync={data.lastSync} />
         </div>
 
         {/* Actions prioritaires */}
@@ -168,10 +127,20 @@ export function Cockpit({
               value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`} />
             <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · ${f.monthLabel}`}
               value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta} />
-            <KpiCard icon={<IconCurrencyBitcoin size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="P&L crypto (global)"
-              value={euro(f.cryptoPnl)} delta={f.cryptoPct} deltaLabel="rendement"
-              foot={`~${euro(f.cryptoTransferredOut)} transférés hors plateforme`} />
+            <LeayaCard ttc={data.leaya} ttcPrev={data.leayaPrev} />
           </div>
+        </div>
+
+        {/* CA HT mensuel — exercice vs N-1 */}
+        <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {data.fy} vs {data.fy - 1}</h2>
+            <div className="flex items-center gap-3 text-xs text-ink-2">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {data.fy}</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {data.fy - 1}</span>
+            </div>
+          </div>
+          <CaVsN1Chart current={data.caFyCur} previous={data.caFyPrev} fy={data.fy} />
         </div>
 
         {/* Bloc Prospection */}

@@ -1,10 +1,9 @@
-import Link from "next/link";
-import { Logo } from "@/components/Logo";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { mapProspect } from "@/lib/prospection-map";
 import type { StageDTO, GroupDTO } from "@/lib/prospection";
 import { lastSyncAll } from "@/lib/sync-state";
+import { AppNav } from "@/components/AppNav";
 import { Prospection } from "./Prospection";
 import { createStarterPipeline } from "./actions";
 
@@ -46,22 +45,7 @@ export default async function ProspectionPage({
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      <header className="bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Logo className="text-lg text-white" />
-            </Link>
-            <span className="text-sm text-white/50">/ Prospection</span>
-          </div>
-          <Link
-            href="/"
-            className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
-          >
-            ← Cockpit
-          </Link>
-        </div>
-      </header>
+      <AppNav role={me.role} />
 
       {!pipeline ? (
         <EmptyState />

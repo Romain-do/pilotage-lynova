@@ -7,6 +7,10 @@ import {
   IconReportMoney,
   IconPercentage,
   IconRepeat,
+  IconChartBar,
+  IconShoppingCart,
+  IconCash,
+  IconClock,
   IconArrowUpRight,
   IconArrowDownRight,
   IconX,
@@ -27,6 +31,7 @@ import {
   rangeLabel,
   fyOf,
   rel,
+  caHtByFiscalMonth,
   type FactDoc,
   type BuyDoc,
   type BuyItemDoc,
@@ -37,6 +42,7 @@ import {
 } from "@/lib/facturation";
 import { netChargesInRange, earliestOutflowDate, type OutflowRow } from "@/lib/tresorerie";
 import { KpiCard } from "@/components/KpiCard";
+import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { RefreshButton } from "@/components/RefreshButton";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -104,6 +110,13 @@ export function Facturation({
   const months = Math.max(1, cur.months.length);
   const avg = cur.caHtTotal / months;
   const avgPrev = prev.caHtTotal / Math.max(1, prev.months.length);
+  const achatsAvg = cur.achatsHt / months;
+  const achatsAvgPrev = prev.achatsHt / Math.max(1, prev.months.length);
+
+  // Graphe « CA HT mensuel — exercice en cours vs N-1 » (axe fiscal oct→sept, indépendant du sélecteur).
+  const fyNow = fyOf(todayISO);
+  const caFyCur = useMemo(() => caHtByFiscalMonth(docs, fyNow), [docs, fyNow]);
+  const caFyPrev = useMemo(() => caHtByFiscalMonth(docs, fyNow - 1), [docs, fyNow]);
 
   const sortedClients = useMemo(
     () => [...clients].sort((a, b) => (clientSort === "ca" ? b.ca - a.ca : b.aboHt - a.aboHt)).slice(0, 12),
@@ -115,7 +128,7 @@ export function Facturation({
       {/* ───────── Barre d'outils ───────── */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-ink">Facturation &amp; marge</h1>
+          <h1 className="text-lg font-semibold text-ink">Evoliz</h1>
           <p className="text-xs text-ink-3">
             {rangeLabel(range)} · comparé à N-1 (même période)
           </p>
@@ -154,12 +167,12 @@ export function Facturation({
         <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct} />
       </div>
 
-      {/* ───────── Stats secondaires ───────── */}
-      <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line sm:grid-cols-4">
-        <StatCell label="CA moyen / mois" value={euro(avg)} delta={rel(avg, avgPrev)} />
-        <StatCell label="Achats HT" value={euro(cur.achatsHt)} delta={rel(cur.achatsHt, prev.achatsHt)} />
-        <StatCell label="Encaissé TTC" value={euro(cur.encaisseTtc)} />
-        <StatCell label="Restant dû TTC" value={euro(cur.resteTtc)} />
+      {/* ───────── Stats secondaires (même gabarit KpiCard, comparaison N-1) ───────── */}
+      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard icon={<IconChartBar size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA moyen / mois" value={euro(avg)} delta={rel(avg, avgPrev)} />
+        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats moyens HT / mois" value={euro(achatsAvg)} delta={rel(achatsAvg, achatsAvgPrev)} />
+        <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)} />
+        <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1" />
       </div>
 
       {/* ───────── Graphiques ───────── */}
@@ -182,6 +195,18 @@ export function Facturation({
         </div>
 
         <SynthBlock stats={cur} />
+      </div>
+
+      {/* ───────── CA HT mensuel — exercice vs N-1 ───────── */}
+      <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {fyNow} vs {fyNow - 1}</h2>
+          <div className="flex items-center gap-3 text-xs text-ink-2">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
+          </div>
+        </div>
+        <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
       </div>
 
       {/* ───────── Clients + Catégories ───────── */}
@@ -368,22 +393,6 @@ function MargeNetteCard({
   );
 }
 
-function StatCell({ label, value, delta }: { label: string; value: string; delta?: number | null }) {
-  return (
-    <div className="bg-white px-3.5 py-2.5">
-      <div className="text-xs text-ink-3">{label}</div>
-      <div className="mt-0.5 flex items-baseline gap-2">
-        <span className="text-base font-semibold text-ink">{value}</span>
-        {delta != null && (
-          <span className={`text-xs font-medium ${delta >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(0)} %
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ───────────────────────── Graphe mensuel ───────────────────────── */
 
 function MonthlyChart({ months, abo, install, achats }: { months: { key: string; label: string }[]; abo: number[]; install: number[]; achats: number[] }) {
@@ -495,7 +504,7 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
   return (
     <div className="rounded-card border border-line bg-white p-4 shadow-card">
       <h2 className="text-sm font-semibold text-ink">Répartition CA &amp; achats</h2>
-      <div className="mt-3 flex items-center gap-4">
+      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
         <div className="relative h-28 w-28 flex-none">
           <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90" role="img"
             aria-label={`Répartition du CA HT : ${euro(stats.caHtTotal)} au total — abonnements ${euro(stats.aboHt)} (${Math.round(aboPct * 100)} %), installations ${euro(stats.installHt)} (${Math.round((1 - aboPct) * 100)} %). Achats ${euro(stats.achatsHt)}, marge ${euro(stats.marge)}.`}>
@@ -514,10 +523,15 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
             {center.p !== null && <span className="text-[10px] text-ink-3">{(center.p * 100).toFixed(0)} %</span>}
           </div>
         </div>
-        <div className="flex-1 space-y-1.5 text-sm">
-          <LegRow color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} />
-          <LegRow color="bg-navy" label="Installations" value={euro(stats.installHt)} />
-          <div className="border-t border-line pt-1.5">
+        <div className="w-full min-w-0 flex-1 space-y-2 text-sm">
+          <LegRow color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} pct={aboPct} />
+          <LegRow color="bg-navy" label="Installations" value={euro(stats.installHt)} pct={1 - aboPct} />
+          <div className="flex items-center gap-2 border-t border-line pt-2">
+            <span className="h-2.5 w-2.5 flex-none rounded-full bg-transparent" />
+            <span className="font-medium text-ink">CA HT total</span>
+            <span className="ml-auto font-semibold tabular-nums text-ink">{euro(stats.caHtTotal)}</span>
+          </div>
+          <div className="space-y-2 border-t border-line pt-2">
             <LegRow color="bg-amber-400" label="Achats" value={euro(stats.achatsHt)} />
             <LegRow color="bg-emerald-500" label="Marge" value={euro(stats.marge)} strong />
           </div>
@@ -527,12 +541,13 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
   );
 }
 
-function LegRow({ color, label, value, strong }: { color: string; label: string; value: string; strong?: boolean }) {
+function LegRow({ color, label, value, strong, pct }: { color: string; label: string; value: string; strong?: boolean; pct?: number }) {
   return (
     <div className="flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-      <span className="text-ink-2">{label}</span>
-      <span className={`ml-auto ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
+      <span className={`h-2.5 w-2.5 flex-none rounded-full ${color}`} />
+      <span className="min-w-0 truncate text-ink-2">{label}</span>
+      {pct != null && <span className="flex-none text-xs text-ink-3">{(pct * 100).toFixed(0)} %</span>}
+      <span className={`ml-auto flex-none tabular-nums ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
     </div>
   );
 }

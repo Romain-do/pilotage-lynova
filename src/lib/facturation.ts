@@ -247,6 +247,23 @@ export function computeRange(
 export const rel = (cur: number, prev: number): number | null =>
   prev !== 0 ? ((cur - prev) / prev) * 100 : null;
 
+// ── CA HT par mois fiscal (oct→sept) pour le graphe « exercice vs N-1 » ──
+export const FISCAL_MONTHS = ["oct.", "nov.", "déc.", "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept."];
+
+/** CA HT (factures) ventilé sur les 12 mois fiscaux [oct → sept] d'un exercice `fy`.
+ *  Indices : oct=0 … sept=11. Les mois sans facture (ou à venir) valent 0. */
+export function caHtByFiscalMonth(docs: FactDoc[], fy: number): number[] {
+  const out = new Array(12).fill(0);
+  const start = `${fy - 1}-10-01`;
+  const end = `${fy}-09-30`;
+  for (const d of docs) {
+    if (d.kind !== "INVOICE" || d.date < start || d.date > end) continue;
+    const m = Number(d.date.slice(5, 7));
+    out[m >= 10 ? m - 10 : m + 2] += d.ht;
+  }
+  return out;
+}
+
 // ── MRR (abonnements du dernier mois civil de la plage) ──
 export function monthAbo(docs: FactDoc[], monthKey: string): number {
   let s = 0;

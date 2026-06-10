@@ -6,8 +6,6 @@ import {
   IconCoins,
   IconCurrencyBitcoin,
   IconArrowsExchange,
-  IconArrowUpRight,
-  IconArrowDownRight,
   IconX,
 } from "@tabler/icons-react";
 import {
@@ -35,6 +33,7 @@ import {
   type TCatRow,
 } from "@/lib/tresorerie";
 import { KpiCard } from "@/components/KpiCard";
+import { LeayaCard } from "@/components/LeayaCard";
 import { RefreshButton } from "@/components/RefreshButton";
 
 interface Data {
@@ -82,7 +81,7 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
       {/* Barre d'outils */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-ink">Trésorerie</h1>
+          <h1 className="text-lg font-semibold text-ink">Revolut Business</h1>
           <p className="text-xs text-ink-3">{rangeLabel(range)} · comparé à N-1 (même période) · lecture seule</p>
         </div>
         <div className="flex flex-col gap-2">
@@ -186,36 +185,6 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
   );
 }
 
-
-/* ───────────── Carte Leaya (gabarit KPI, style maison Leaya) ───────────── */
-function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
-  const ht = ttc / 1.2; // TVA 20 %
-  const delta = ttcPrev > 0 ? rel(ttc, ttcPrev) : null;
-  return (
-    <div className="group rounded-card border border-leaya-border bg-leaya p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
-      <div className="flex h-8 items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-leaya-gold">Versé à</span>
-        <span className="font-serif text-lg italic leading-none text-leaya-gold">Leaya</span>
-      </div>
-      <div className="mt-2.5 flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold leading-none text-leaya-ink">{euro(ttc)}</span>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-leaya-gold">TTC</span>
-      </div>
-      <div className="mt-1.5 space-y-1 text-xs">
-        {delta != null && (
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-leaya-badge px-1.5 py-0.5 font-semibold text-leaya-ink">
-              {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {Math.abs(delta).toFixed(1)} %
-            </span>
-            <span className="text-ink-3">Vs N-1</span>
-          </span>
-        )}
-        <div className="text-ink-3">soit <strong className="font-medium text-leaya-ink">{euro(ht)}</strong> HT · TVA 20 %</div>
-      </div>
-    </div>
-  );
-}
 
 /* ───────────── Soldes par compte ───────────── */
 function AccountsList({ accounts }: { accounts: TAccount[] }) {
@@ -336,11 +305,9 @@ function TresoAreaChart({ series }: { series: SeriePoint[] }) {
             <path d={line} fill="none" stroke="var(--color-cyan-600)" strokeWidth={2} vectorEffect="non-scaling-stroke"
               strokeLinejoin="round" strokeLinecap="round" />
           </svg>
-          {/* Marqueur dernier point */}
+          {/* Marqueur dernier point (sans étiquette flottante : la valeur reste lisible au survol) */}
           <span className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-600 shadow"
             style={{ left: `${last.x}%`, top: `${last.y}%` }} />
-          <span className="pointer-events-none absolute -translate-x-1/2 -translate-y-[170%] whitespace-nowrap rounded-md bg-navy px-1.5 py-0.5 text-[10px] font-semibold text-white"
-            style={{ left: `${Math.min(88, last.x)}%`, top: `${last.y}%` }}>{euro(lastVal)}</span>
           {/* Marqueur survol */}
           {hover !== null && hover !== n - 1 && (
             <span className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-600"
