@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { FactDoc } from "@/lib/facturation";
+import type { FactDoc, BuyDoc, BuyItemDoc } from "@/lib/facturation";
 import { Facturation } from "./Facturation";
 
 // Vue Facturation (§5) — réservée au DIRIGEANT (donnée financière, §3).
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function FacturationPage() {
   await requireDirigeant();
 
-  const [docs, sync] = await Promise.all([
+  const [docs, sync, buyRows] = await Promise.all([
     // CA brut (aligné Evoliz) : on ne lit que les factures validées ; les avoirs ne sont
     // jamais déduits du CA (kind = CREDIT ignoré).
     prisma.evolizDocument.findMany({
@@ -29,7 +29,29 @@ export default async function FacturationPage() {
       },
     }),
     prisma.syncState.findUnique({ where: { source: "evoliz" } }),
+    // Achats fournisseurs (marge commerciale), avec lignes ventilées par catégorie.
+    prisma.evolizBuy.findMany({
+      where: { included: true },
+      select: {
+        documentDate: true,
+        totalHt: true,
+        items: { select: { categoryCode: true, categoryLabel: true, ht: true } },
+      },
+    }),
   ]);
+
+  const buys: BuyDoc[] = buyRows.map((b) => ({
+    date: b.documentDate.toISOString().slice(0, 10),
+    ht: Number(b.totalHt),
+  }));
+  const buyItems: BuyItemDoc[] = buyRows.flatMap((b) =>
+    b.items.map((it) => ({
+      date: b.documentDate.toISOString().slice(0, 10),
+      categoryCode: it.categoryCode,
+      categoryLabel: it.categoryLabel,
+      ht: Number(it.ht),
+    }))
+  );
 
   const factDocs: FactDoc[] = docs.map((d) => ({
     kind: d.kind,
@@ -72,7 +94,13 @@ export default async function FacturationPage() {
           </p>
         </section>
       ) : (
-        <Facturation docs={factDocs} todayISO={todayISO} lastSync={lastSync} />
+        <Facturation
+          docs={factDocs}
+          buys={buys}
+          buyItems={buyItems}
+          todayISO={todayISO}
+          lastSync={lastSync}
+        />
       )}
     </main>
   );

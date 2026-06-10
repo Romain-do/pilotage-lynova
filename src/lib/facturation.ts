@@ -209,6 +209,124 @@ export interface ClientRow {
   aboHt: number; // part abonnement
 }
 
+// ── Marge commerciale (CA HT − achats fournisseurs HT) ──
+
+export interface BuyDoc {
+  date: string; // yyyy-mm-dd
+  ht: number;
+}
+export interface BuyItemDoc {
+  date: string; // date de l'achat
+  categoryCode: string | null;
+  categoryLabel: string | null;
+  ht: number;
+}
+
+export interface MargeResult {
+  achatsHt: number; // exercice (à date)
+  marge: number; // CA − achats
+  taux: number | null; // % (marge / CA)
+  monthlyAchats: number[]; // 12 mois fiscaux
+  // Comparaisons N-1 « à date » (mois entiers)
+  achatsPct: number | null;
+  margePct: number | null;
+  tauxDeltaPts: number | null; // écart en points de %
+}
+
+export interface CatRow {
+  code: string | null;
+  label: string;
+  ht: number;
+}
+
+function asOfBounds(fy: number, todayISO: string) {
+  const partial = fyOf(todayISO) === fy;
+  const today = new Date(todayISO);
+  let asOf: Date;
+  let asOfPrev: Date;
+  if (partial) {
+    const y = today.getUTCFullYear();
+    const m = today.getUTCMonth();
+    asOf = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59));
+    asOfPrev = new Date(Date.UTC(y - 1, m + 1, 0, 23, 59, 59));
+  } else {
+    asOf = fyEnd(fy);
+    asOfPrev = fyEnd(fy - 1);
+  }
+  return { start: fyStart(fy), asOf, prevStart: fyStart(fy - 1), asOfPrev };
+}
+
+const rel = (cur: number, prev: number): number | null =>
+  prev !== 0 ? ((cur - prev) / prev) * 100 : null;
+
+/** Achats HT d'un exercice + ventilation mensuelle (oct→sept). */
+export function computeBuys(buys: BuyDoc[], fy: number): { achatsHt: number; monthly: number[] } {
+  const start = fyStart(fy);
+  const end = fyEnd(fy);
+  const monthly = new Array(12).fill(0);
+  let achatsHt = 0;
+  for (const b of buys) {
+    if (!inRange(b.date, start, end)) continue;
+    achatsHt += b.ht;
+    monthly[fyMonthIndex(b.date)] += b.ht;
+  }
+  return { achatsHt, monthly };
+}
+
+/** Marge commerciale = CA HT (toutes typologies) − achats HT, avec comparaisons N-1 à date. */
+export function computeMarge(
+  docs: FactDoc[],
+  buys: BuyDoc[],
+  fy: number,
+  todayISO: string
+): MargeResult {
+  const caHt = computeExercice(docs, fy, "all").caHt;
+  const { achatsHt, monthly } = computeBuys(buys, fy);
+  const marge = caHt - achatsHt;
+  const taux = caHt > 0 ? (marge / caHt) * 100 : null;
+
+  const { start, asOf, prevStart, asOfPrev } = asOfBounds(fy, todayISO);
+  const sumDocs = (s: Date, e: Date) =>
+    docs.reduce((acc, d) => (inRange(d.date, s, e) ? acc + signed(d) : acc), 0);
+  const sumBuys = (s: Date, e: Date) =>
+    buys.reduce((acc, b) => (inRange(b.date, s, e) ? acc + b.ht : acc), 0);
+
+  const caCur = sumDocs(start, asOf);
+  const caPrev = sumDocs(prevStart, asOfPrev);
+  const achCur = sumBuys(start, asOf);
+  const achPrev = sumBuys(prevStart, asOfPrev);
+  const margeCur = caCur - achCur;
+  const margePrev = caPrev - achPrev;
+  const tauxCur = caCur > 0 ? (margeCur / caCur) * 100 : null;
+  const tauxPrev = caPrev > 0 ? (margePrev / caPrev) * 100 : null;
+
+  return {
+    achatsHt,
+    marge,
+    taux,
+    monthlyAchats: monthly,
+    achatsPct: rel(achCur, achPrev),
+    margePct: rel(margeCur, margePrev),
+    tauxDeltaPts: tauxCur !== null && tauxPrev !== null ? tauxCur - tauxPrev : null,
+  };
+}
+
+/** Répartition des achats par catégorie pour un exercice (triée par montant décroissant). */
+export function computeBuyCategories(items: BuyItemDoc[], fy: number): CatRow[] {
+  const start = fyStart(fy);
+  const end = fyEnd(fy);
+  const map = new Map<string, CatRow>();
+  for (const it of items) {
+    if (!inRange(it.date, start, end)) continue;
+    const label = it.categoryLabel ?? "(sans catégorie)";
+    const key = `${it.categoryCode ?? "—"}|${label}`;
+    const cur = map.get(key) ?? { code: it.categoryCode, label, ht: 0 };
+    cur.ht += it.ht;
+    map.set(key, cur);
+  }
+  return [...map.values()].filter((c) => c.ht !== 0).sort((a, b) => b.ht - a.ht);
+}
+
 export function computeClients(docs: FactDoc[], fy: number): ClientRow[] {
   const start = fyStart(fy);
   const end = fyEnd(fy);

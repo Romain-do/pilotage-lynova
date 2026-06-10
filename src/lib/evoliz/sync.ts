@@ -227,3 +227,131 @@ export async function syncEvoliz(prisma: PrismaClient): Promise<EvolizSyncSummar
 
   return summary;
 }
+
+// ───────────────────────── Achats (marge commerciale) ─────────────────────────
+
+export interface BuysSyncSummary {
+  buys: number;
+  buysIncluded: number;
+  itemsFallback: number; // achats rabattus sur catégorie dominante (HT ligne absent)
+  totalHt: number; // achats inclus seulement
+  minDate: string | null;
+  maxDate: string | null;
+}
+
+interface BuyItemRow {
+  categoryCode: string | null;
+  categoryLabel: string | null;
+  ht: number;
+  fallback: boolean;
+}
+
+/** Catégorie dominante (la plus fréquente) parmi les lignes d'un achat. */
+function dominantCategory(items: Record<string, unknown>[]): { code: string | null; label: string | null } {
+  const count = new Map<string, { code: string | null; label: string | null; n: number }>();
+  for (const it of items) {
+    const pc = (it.purchase_classification ?? {}) as Record<string, unknown>;
+    const code = (pc.code as string) ?? null;
+    const label = (pc.label as string) ?? null;
+    const key = code ?? label ?? "—";
+    const cur = count.get(key) ?? { code, label, n: 0 };
+    cur.n++;
+    count.set(key, cur);
+  }
+  let best: { code: string | null; label: string | null; n: number } | null = null;
+  for (const v of count.values()) if (!best || v.n > best.n) best = v;
+  return best ? { code: best.code, label: best.label } : { code: null, label: null };
+}
+
+export async function syncEvolizBuys(prisma: PrismaClient): Promise<BuysSyncSummary> {
+  const client = createEvolizClient();
+  const dateMax = todayISO();
+  const buys = await fetchAll(client, "buys", HISTORY_START, dateMax);
+
+  // Cache reconstruit à chaque synchro (source unique en lecture seule).
+  await prisma.evolizBuyItem.deleteMany({});
+  await prisma.evolizBuy.deleteMany({});
+
+  let buysIncluded = 0;
+  let itemsFallback = 0;
+  let totalHt = 0;
+  const dates: number[] = [];
+  const seen = new Set<number>();
+
+  for (const b of buys) {
+    const evolizId = Number(b.buyid);
+    const documentDate = new Date(b.documentdate as string);
+    if (!Number.isFinite(evolizId) || Number.isNaN(documentDate.getTime())) continue;
+    if (seen.has(evolizId)) continue; // doublon de pagination
+    seen.add(evolizId);
+
+    const enabled = b.enabled !== false;
+    const status = (b.status as string) ?? null;
+    const included = enabled && status !== "draft";
+    const buyHt = amt((b.total as Record<string, unknown>)?.vat_exclude);
+    const supplier = (b.supplier ?? {}) as Record<string, unknown>;
+    const rawItems = Array.isArray(b.items) ? (b.items as Record<string, unknown>[]) : [];
+
+    // Ventilation au niveau ligne ; repli sur catégorie dominante si un HT ligne manque.
+    const anyMissing = rawItems.some(
+      (it) => (it.total as Record<string, unknown>)?.vat_exclude == null
+    );
+    let items: BuyItemRow[];
+    if (rawItems.length === 0) {
+      items = [{ categoryCode: null, categoryLabel: "(sans catégorie)", ht: buyHt, fallback: true }];
+      itemsFallback++;
+    } else if (anyMissing) {
+      const dom = dominantCategory(rawItems);
+      items = [{ categoryCode: dom.code, categoryLabel: dom.label, ht: buyHt, fallback: true }];
+      itemsFallback++;
+    } else {
+      items = rawItems.map((it) => {
+        const pc = (it.purchase_classification ?? {}) as Record<string, unknown>;
+        return {
+          categoryCode: (pc.code as string) ?? null,
+          categoryLabel: (pc.label as string) ?? null,
+          ht: amt((it.total as Record<string, unknown>).vat_exclude),
+          fallback: false,
+        };
+      });
+    }
+
+    if (included) {
+      buysIncluded++;
+      totalHt += buyHt;
+    }
+    dates.push(documentDate.getTime());
+
+    await prisma.evolizBuy.create({
+      data: {
+        evolizId,
+        documentNumber: (b.document_number as string) ?? null,
+        documentDate,
+        supplierId: supplier.supplierid != null ? Number(supplier.supplierid) : null,
+        supplierName: (supplier.name as string) ?? null,
+        totalHt: buyHt,
+        status,
+        enabled,
+        included,
+        items: { create: items },
+      },
+    });
+  }
+
+  const summary: BuysSyncSummary = {
+    buys: buys.length,
+    buysIncluded,
+    itemsFallback,
+    totalHt,
+    minDate: dates.length ? new Date(Math.min(...dates)).toISOString().slice(0, 10) : null,
+    maxDate: dates.length ? new Date(Math.max(...dates)).toISOString().slice(0, 10) : null,
+  };
+
+  await prisma.syncState.upsert({
+    where: { source: "evoliz_buys" },
+    update: { lastSyncAt: new Date(), detail: JSON.stringify(summary) },
+    create: { source: "evoliz_buys", lastSyncAt: new Date(), detail: JSON.stringify(summary) },
+  });
+
+  return summary;
+}

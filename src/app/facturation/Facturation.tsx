@@ -18,12 +18,17 @@ import {
   compareAsOf,
   computeMRR,
   computeClients,
+  computeMarge,
+  computeBuyCategories,
   fyMonthIndex,
   FY_MONTH_LABELS,
   type FactDoc,
   type TypeFilter,
+  type BuyDoc,
+  type BuyItemDoc,
+  type CatRow,
 } from "@/lib/facturation";
-import { IconChartBar } from "@tabler/icons-react";
+import { IconChartBar, IconShoppingCart, IconPigMoney, IconPercentage } from "@tabler/icons-react";
 import { refreshEvoliz } from "./actions";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -34,10 +39,14 @@ const TYPES: { key: TypeFilter; label: string }[] = [
 
 export function Facturation({
   docs,
+  buys,
+  buyItems,
   todayISO,
   lastSync,
 }: {
   docs: FactDoc[];
+  buys: BuyDoc[];
+  buyItems: BuyItemDoc[];
   todayISO: string;
   lastSync: string | null;
 }) {
@@ -60,6 +69,11 @@ export function Facturation({
   // Mois écoulés dans l'exercice (jusqu'à fin du mois courant) ; CA moyen / mois.
   const elapsedMonths = cmp.partial ? fyMonthIndex(todayISO) + 1 : 12;
   const avgPerMonth = stats.caHt / elapsedMonths;
+
+  // Marge commerciale (CA HT total − achats fournisseurs HT).
+  const marge = useMemo(() => computeMarge(docs, buys, fy, todayISO), [docs, buys, fy, todayISO]);
+  const cats = useMemo(() => computeBuyCategories(buyItems, fy), [buyItems, fy]);
+  const caMonthly = useMemo(() => computeExercice(docs, fy, "all").monthly, [docs, fy]);
 
   return (
     <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
@@ -197,10 +211,70 @@ export function Facturation({
         <ClientsTable rows={sortedClients} sortKey={clientSort} />
       </div>
 
-      <p className="mt-4 text-xs text-ink-3">
+      {/* ─────────────────────── Marge commerciale ─────────────────────── */}
+      <div className="mt-8 border-t border-line pt-6">
+        <h2 className="text-base font-semibold text-ink">Marge commerciale</h2>
+        <p className="mt-0.5 text-xs text-ink-3">
+          CA HT − achats fournisseurs · hors rémunération dirigeant, charges sociales, impôts et
+          amortissements
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <KpiCard
+            icon={<IconShoppingCart size={18} stroke={2} />}
+            tint="bg-amber-50 text-amber-600"
+            label="Achats HT"
+            value={euro(marge.achatsHt)}
+            delta={marge.achatsPct}
+            deltaHint="Vs N-1"
+          />
+          <KpiCard
+            icon={<IconPigMoney size={18} stroke={2} />}
+            tint="bg-emerald-50 text-emerald-600"
+            label="Marge commerciale"
+            value={euro(marge.marge)}
+            delta={marge.margePct}
+            deltaHint="Vs N-1"
+          />
+          <KpiCard
+            icon={<IconPercentage size={18} stroke={2} />}
+            tint="bg-cyan/15 text-cyan-600"
+            label="Taux de marge"
+            value={marge.taux != null ? `${marge.taux.toFixed(1)} %` : "—"}
+            delta={marge.tauxDeltaPts}
+            deltaUnit="pts"
+            deltaHint="Vs N-1"
+          />
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="rounded-card border border-line bg-white p-5 shadow-card lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">CA vs Achats — mensuel HT</h3>
+                <p className="text-xs text-ink-3">Exercice {fy} · axe oct → sept</p>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-ink-2">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> CA</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Achats</span>
+              </div>
+            </div>
+            <CAvsAchatsChart ca={caMonthly} achats={marge.monthlyAchats} />
+          </div>
+
+          <div className="rounded-card border border-line bg-white p-5 shadow-card">
+            <h3 className="text-sm font-semibold text-ink">Achats par catégorie</h3>
+            <p className="text-xs text-ink-3">Exercice {fy} · HT</p>
+            <CategoryBreakdown cats={cats} />
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-6 text-xs text-ink-3">
         CA en <strong className="text-ink-2">HT brut</strong> (factures validées, avoirs non déduits,
         aligné Evoliz) · abonnement &lt; 2 000 € HT / installation ≥ 2 000 € · « encaissé » et
-        « restant dû » en <strong className="text-ink-2">TTC</strong>.
+        « restant dû » en <strong className="text-ink-2">TTC</strong> · marge =
+        <strong className="text-ink-2"> commerciale</strong> (CA − achats fournisseurs).
       </p>
     </div>
   );
@@ -215,6 +289,7 @@ function KpiCard({
   value,
   delta,
   deltaHint,
+  deltaUnit = "%",
   foot,
 }: {
   icon: React.ReactNode;
@@ -223,6 +298,7 @@ function KpiCard({
   value: string;
   delta?: number | null;
   deltaHint?: string;
+  deltaUnit?: string;
   foot?: string;
 }) {
   return (
@@ -244,7 +320,7 @@ function KpiCard({
                 }`}
               >
                 {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-                {Math.abs(delta).toFixed(1)} %
+                {Math.abs(delta).toFixed(1)} {deltaUnit}
               </span>
               {deltaHint && <span className="text-ink-3">{deltaHint}</span>}
             </span>
@@ -671,4 +747,117 @@ function relativeTime(iso: string, now: number): string {
   if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
   if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
   return `il y a ${Math.floor(s / 86400)} j`;
+}
+
+/* ─────────────────── CA vs Achats (mensuel) ─────────────────── */
+
+function CAvsAchatsChart({ ca, achats }: { ca: number[]; achats: number[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(1, ...ca, ...achats);
+  return (
+    <div className="relative mt-4" onMouseLeave={() => setHover(null)}>
+      <div className="flex h-56 items-end gap-1 sm:gap-1.5">
+        {FY_MONTH_LABELS.map((m, i) => {
+          const active = hover === null || hover === i;
+          return (
+            <div
+              key={m}
+              className="relative flex h-full flex-1 cursor-default flex-col items-center justify-end rounded-lg"
+              onMouseEnter={() => setHover(i)}
+            >
+              <div className={`absolute inset-x-0 bottom-6 top-0 rounded-lg transition-colors ${hover === i ? "bg-cyan/[0.07]" : "bg-transparent"}`} />
+              <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-6">
+                <SimpleBar value={ca[i]} max={max} idx={i} color="bg-cyan" dim={!active} />
+                <SimpleBar value={achats[i]} max={max} idx={i} color="bg-amber-400" dim={!active} />
+              </div>
+              <span className={`absolute bottom-0 text-[10px] transition-colors ${hover === i ? "font-semibold text-ink" : "text-ink-3"}`}>{m}</span>
+            </div>
+          );
+        })}
+      </div>
+      {hover !== null && (
+        <MargeTooltip index={hover} month={FY_MONTH_LABELS[hover]} ca={ca[hover]} achats={achats[hover]} />
+      )}
+    </div>
+  );
+}
+
+function SimpleBar({ value, max, idx, color, dim }: { value: number; max: number; idx: number; color: string; dim: boolean }) {
+  const h = Math.min(100, (value / max) * 100);
+  return (
+    <div
+      className={`w-2.5 origin-bottom rounded-t-md transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-3 ${color} ${dim ? "opacity-40" : "opacity-100"}`}
+      style={{ height: `${h}%`, animationDelay: `${idx * 25}ms` }}
+    />
+  );
+}
+
+function MargeTooltip({ index, month, ca, achats }: { index: number; month: string; ca: number; achats: number }) {
+  const marge = ca - achats;
+  const taux = ca > 0 ? (marge / ca) * 100 : null;
+  const left = ((index + 0.5) / 12) * 100;
+  const alignRight = index >= 8;
+  return (
+    <div
+      className="pointer-events-none absolute top-0 z-10 w-48 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover"
+      style={{ left: `${left}%`, ...(alignRight ? { transform: "translateX(-85%)" } : {}) }}
+    >
+      <div className="font-semibold text-ink">{month}.</div>
+      <div className="mt-2 space-y-1">
+        <Row label="CA HT" value={euro(ca)} />
+        <Row label="Achats HT" value={euro(achats)} />
+        <Row label="Marge" value={euro(marge)} strong />
+      </div>
+      <div className="mt-2 border-t border-line pt-1.5 text-ink-3">
+        {taux !== null ? `Taux ${taux.toFixed(0)} %` : "—"}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────── Achats par catégorie ─────────────────── */
+
+function CategoryBreakdown({ cats }: { cats: CatRow[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  if (cats.length === 0) {
+    return <p className="mt-6 text-center text-sm text-ink-3">Aucun achat sur cet exercice.</p>;
+  }
+  const named = cats.filter((c) => c.label !== "(sans catégorie)").slice(0, 10);
+  const sans = cats.filter((c) => c.label === "(sans catégorie)");
+  const ordered = [...named, ...sans];
+  const total = cats.reduce((s, c) => s + c.ht, 0);
+  const max = Math.max(1, ...ordered.map((c) => c.ht));
+
+  return (
+    <div className="mt-3 space-y-1.5" onMouseLeave={() => setHover(null)}>
+      {ordered.map((c, i) => {
+        const pct = total > 0 ? (c.ht / total) * 100 : 0;
+        const w = Math.max(2, (c.ht / max) * 100);
+        const isSans = c.label === "(sans catégorie)";
+        return (
+          <div
+            key={c.label}
+            onMouseEnter={() => setHover(i)}
+            className={`rounded-lg px-1.5 py-1 transition-colors ${hover === i ? "bg-cyan/[0.06]" : ""}`}
+          >
+            <div className="flex items-baseline justify-between gap-2 text-xs">
+              <span className={`truncate ${isSans ? "italic text-ink-3" : "text-ink-2"}`}>{c.label}</span>
+              <span className="flex-none font-medium text-ink">
+                {euro(c.ht)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${isSans ? "bg-navy/30" : "bg-amber-400"}`}
+                style={{ width: `${w}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+      <div className="border-t border-line pt-2 text-xs text-ink-3">
+        Total achats : <strong className="text-ink">{euro(total)}</strong>
+      </div>
+    </div>
+  );
 }
