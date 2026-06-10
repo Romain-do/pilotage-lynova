@@ -43,16 +43,19 @@ export function Prospection({
   currentUser,
   initialGroups,
   initialStages,
+  initialSelectedId = null,
 }: {
   pipelineName: string;
   currentUser: CurrentUserDTO;
   initialGroups: GroupDTO[];
   initialStages: StageDTO[];
+  initialSelectedId?: string | null;
 }) {
   const [stages, setStages] = useState<StageDTO[]>(initialStages);
   const [groups, setGroups] = useState<GroupDTO[]>(initialGroups);
   const [view, setView] = useState<View>("list");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Deep-link depuis le Cockpit (/prospection?prospect=<id>) : ouvre la fiche directement.
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [managerOpen, setManagerOpen] = useState(false);
   const [, startTx] = useTransition();
 

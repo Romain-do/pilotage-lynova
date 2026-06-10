@@ -1,116 +1,184 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { requireUser } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { prisma } from "@/lib/prisma";
+import {
+  computeRange,
+  computeMRR,
+  fyOf,
+  fyRange,
+  fyLabel,
+  shiftYear,
+  presetRange,
+  rel,
+  euro,
+  type FactDoc,
+  type BuyDoc,
+} from "@/lib/facturation";
+import { buildTresorerie } from "@/lib/tresorerie-data";
+import {
+  flowsInRange,
+  netChargesInRange,
+  earliestOutflowDate,
+} from "@/lib/tresorerie";
+import { categoryOf, reminderStatus, formatDateFR, type KpiCategory } from "@/lib/prospection";
+import { Cockpit, type CockpitData } from "./Cockpit";
 
-// Page authentifiée : dépend de la session (cookies) → jamais de cache statique.
+// Accueil = Cockpit (§9.7) pour le DIRIGEANT. Le COMMERCIAL est redirigé vers la prospection.
+// Dépend de la session (cookies) → jamais de cache statique.
 export const dynamic = "force-dynamic";
 
-const ROLE_LABEL: Record<string, string> = {
-  DIRIGEANT: "Dirigeant",
-  COMMERCIAL: "Commercial",
-};
-
 export default async function Home() {
-  // Mode bootstrap : tant que Supabase n'est pas configuré, on affiche les instructions.
-  if (!isSupabaseConfigured()) {
-    return <NotConfigured />;
-  }
+  if (!isSupabaseConfigured()) return <NotConfigured />;
 
-  // Contrôle serveur (le middleware protège déjà, mais §3 : jamais que l'UI).
+  // Contrôle serveur (§3) — le middleware protège déjà, mais jamais que l'UI.
   const user = await requireUser();
+  if (user.role !== "DIRIGEANT") redirect("/prospection");
 
-  return (
-    <main className="flex flex-1 flex-col">
-      <header className="bg-navy text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Logo className="text-lg text-white" />
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-white/70 sm:inline">
-              {user.email}
-            </span>
-            <span className="rounded-full bg-cyan/20 px-2.5 py-1 text-xs font-medium text-cyan">
-              {ROLE_LABEL[user.role] ?? user.role}
-            </span>
-            {user.role === "DIRIGEANT" && (
-              <Link
-                href="/admin"
-                className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
-              >
-                Administration
-              </Link>
-            )}
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
-              >
-                Se déconnecter
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
+  const data = await buildCockpitData();
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const dateLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
-      <section className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
-        <p className="text-sm font-medium uppercase tracking-wide text-cyan-600">
-          Étape 2 — Authentification
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-navy">
-          Bonjour {user.name ?? user.email}
-        </h1>
-        <p className="mt-3 max-w-2xl text-navy/70">
-          Vous êtes connecté avec le rôle{" "}
-          <strong className="text-navy">{ROLE_LABEL[user.role] ?? user.role}</strong>.
-          Les vues Cockpit, Trésorerie, Facturation et Prospection seront construites
-          aux étapes suivantes (le cloisonnement par rôle est déjà appliqué côté serveur).
-        </p>
+  return <Cockpit user={{ name: user.name, email: user.email, role: user.role }} dateLabel={dateLabel} data={data} />;
+}
 
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
-            <p className="font-medium text-navy">Cockpit</p>
-            <p className="mt-1 text-sm text-navy/50">À venir</p>
-          </div>
-          {user.role === "DIRIGEANT" ? (
-            <>
-              <Link
-                href="/tresorerie"
-                className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
-              >
-                <p className="font-medium text-navy">Trésorerie</p>
-                <p className="mt-1 text-sm text-cyan-600">Ouvrir →</p>
-              </Link>
-              <Link
-                href="/facturation"
-                className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
-              >
-                <p className="font-medium text-navy">Facturation</p>
-                <p className="mt-1 text-sm text-cyan-600">Ouvrir →</p>
-              </Link>
-            </>
-          ) : (
-            <>
-              <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
-                <p className="font-medium text-navy">Trésorerie</p>
-                <p className="mt-1 text-sm text-navy/50">Réservé direction</p>
-              </div>
-              <div className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm">
-                <p className="font-medium text-navy">Facturation</p>
-                <p className="mt-1 text-sm text-navy/50">Réservé direction</p>
-              </div>
-            </>
-          )}
-          <Link
-            href="/prospection"
-            className="rounded-xl border border-navy/10 bg-white p-5 shadow-sm transition-colors hover:border-cyan/60"
-          >
-            <p className="font-medium text-navy">Prospection</p>
-            <p className="mt-1 text-sm text-cyan-600">Ouvrir le pipeline →</p>
-          </Link>
-        </div>
-      </section>
-    </main>
+const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
+
+async function buildCockpitData(): Promise<CockpitData> {
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  const [docRows, buyRows, treso, pipeline] = await Promise.all([
+    prisma.evolizDocument.findMany({
+      where: { kind: "INVOICE", included: true },
+      select: { kind: true, documentDate: true, totalHt: true, totalTtc: true, paid: true, netToPay: true, clientId: true, clientName: true },
+    }),
+    prisma.evolizBuy.findMany({ where: { included: true }, select: { documentDate: true, totalHt: true, supplierId: true } }),
+    buildTresorerie(prisma),
+    prisma.pipeline.findFirst({
+      where: { archived: false },
+      orderBy: { createdAt: "asc" },
+      include: {
+        stages: {
+          orderBy: { position: "asc" },
+          include: { prospects: { where: { archived: false }, select: { id: true, name: true, company: true, reminderAt: true, reminderDone: true } } },
+        },
+      },
+    }),
+  ]);
+
+  const docs: FactDoc[] = docRows.map((d) => ({
+    kind: d.kind, date: d.documentDate.toISOString().slice(0, 10), ht: Number(d.totalHt), ttc: Number(d.totalTtc),
+    paid: Number(d.paid), netToPay: Number(d.netToPay), clientId: d.clientId, clientName: d.clientName,
+  }));
+  const buys: BuyDoc[] = buyRows.map((b) => ({ date: b.documentDate.toISOString().slice(0, 10), ht: Number(b.totalHt), supplierId: b.supplierId }));
+
+  // ── Finances : exercice en cours vs N-1 (définitions identiques à Facturation) ──
+  const fy = fyOf(todayISO);
+  const range = fyRange(fy, todayISO);
+  const prevRange = shiftYear(range);
+  const cur = computeRange(docs, buys, range, "all");
+  const prev = computeRange(docs, buys, prevRange, "all");
+
+  const bankStart = earliestOutflowDate(treso.outflows);
+  const hasBank = bankStart != null && range.end >= bankStart;
+  const hasBankPrev = bankStart != null && prevRange.end >= bankStart;
+  const net = netChargesInRange(treso.outflows, range);
+  const netPrev = netChargesInRange(treso.outflows, prevRange);
+  const margeNette = cur.marge - net.total;
+  const margeNettePrev = prev.marge - netPrev.total;
+  const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
+  const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
+  const mrr = computeMRR(docs, range);
+
+  // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
+  const fiatEur = treso.accounts.filter((a) => a.kind === "FIAT").reduce((s, a) => s + (a.valoEur ?? 0), 0);
+  const cryptoEur = treso.accounts.filter((a) => a.kind === "CRYPTO").reduce((s, a) => s + (a.valoEur ?? 0), 0);
+  const monthRange = presetRange("current-month", todayISO);
+  const monthPrev = shiftYear(monthRange);
+  const cashNetMonth = flowsInRange(treso.months, monthRange).net;
+  const cashNetMonthPrev = flowsInRange(treso.months, monthPrev).net;
+  const hasBankMonthPrev = bankStart != null && monthPrev.end >= bankStart;
+
+  const monthLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+
+  // ── Prospection (définitions identiques à la liste) ──
+  const rows = (pipeline?.stages ?? []).flatMap((s) =>
+    s.prospects.map((pr) => ({ id: pr.id, name: pr.name, company: pr.company, reminderAt: pr.reminderAt, reminderDone: pr.reminderDone, kind: s.kind }))
   );
+  const counts: Record<KpiCategory, number> = { a_rencontrer: 0, rencontres: 0, a_installer: 0, installes: 0, refus: 0 };
+  for (const r of rows) {
+    const c = categoryOf(r.kind);
+    if (c) counts[c] += 1;
+  }
+  const clientsActuels = counts.a_installer + counts.installes;
+  const tauxReussite =
+    clientsActuels + counts.refus > 0 ? Math.round((clientsActuels / (clientsActuels + counts.refus)) * 100) : 0;
+
+  const now = Date.now();
+  const overdue = rows
+    .filter((r) => {
+      if (!r.reminderAt || r.reminderDone) return false;
+      const c = categoryOf(r.kind);
+      if (!c || HIDDEN_CATS.has(c)) return false;
+      return reminderStatus(r.reminderAt.toISOString(), r.reminderDone, now) === "overdue";
+    })
+    .sort((a, b) => a.reminderAt!.getTime() - b.reminderAt!.getTime());
+
+  const recontacter = overdue.slice(0, 6).map((r) => ({
+    id: r.id,
+    name: r.name,
+    company: r.company,
+    dateLabel: formatDateFR(r.reminderAt!.toISOString()) ?? "",
+  }));
+
+  // ── Actions prioritaires (déduites des données) ──
+  const unpaidTtc = docs.reduce((s, d) => s + (d.kind === "INVOICE" ? d.netToPay : 0), 0);
+  const alerts: CockpitData["alerts"] = [];
+  if (cashNetMonth < 0) alerts.push({ tone: "danger", text: `Cash net négatif ce mois (${euro(cashNetMonth)})`, href: "/tresorerie" });
+  if (overdue.length > 0) alerts.push({ tone: "warn", text: `${overdue.length} prospect${overdue.length > 1 ? "s" : ""} à recontacter (rappel échu)`, href: "/prospection" });
+  if (unpaidTtc >= 1) alerts.push({ tone: "warn", text: `${euro(unpaidTtc)} de factures impayées (restant dû)`, href: "/facturation" });
+  if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${mrr.pct.toFixed(0)} %)`, href: "/facturation" });
+  if (counts.a_rencontrer > 0) alerts.push({ tone: "info", text: `${counts.a_rencontrer} prospect${counts.a_rencontrer > 1 ? "s" : ""} à rencontrer`, href: "/prospection" });
+
+  return {
+    fyLabel: fyLabel(fy),
+    finance: {
+      caHt: cur.caHtTotal,
+      caDelta: rel(cur.caHtTotal, prev.caHtTotal),
+      margeNette,
+      margeNetteDelta: hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null,
+      hasBank,
+      tauxNette,
+      tauxNetteDeltaPts: hasBank && hasBankPrev && tauxNette != null && tauxNettePrev != null ? tauxNette - tauxNettePrev : null,
+      mrr: mrr.mrr,
+      mrrDelta: mrr.pct,
+      mrrLabel: mrr.monthLabel,
+      tresoTotal: fiatEur + cryptoEur,
+      fiatEur,
+      cryptoEur,
+      cashNetMonth,
+      cashNetMonthDelta: hasBankMonthPrev ? rel(cashNetMonth, cashNetMonthPrev) : null,
+      monthLabel,
+      cryptoPnl: treso.cryptoPnl.pnl,
+      cryptoPct: treso.cryptoPnl.pct,
+      cryptoTransferredOut: treso.cryptoPnl.transferredOutValue,
+    },
+    prospection: {
+      totalProspects: rows.length,
+      clientsActuels,
+      tauxReussite,
+      aRencontrer: counts.a_rencontrer,
+      aRecontacter: overdue.length,
+      recontacter,
+    },
+    alerts: alerts.slice(0, 5),
+  };
 }
 
 function NotConfigured() {
@@ -125,12 +193,9 @@ function NotConfigured() {
     <main className="flex flex-1 items-center justify-center px-6 py-16">
       <div className="w-full max-w-xl rounded-2xl border border-navy/10 bg-white p-8 shadow-sm">
         <Logo className="text-2xl text-navy" />
-        <h1 className="mt-6 text-xl font-semibold text-navy">
-          Configuration requise
-        </h1>
+        <h1 className="mt-6 text-xl font-semibold text-navy">Configuration requise</h1>
         <p className="mt-2 text-sm text-navy/70">
-          L&apos;ossature est en place. Renseignez les secrets pour activer
-          l&apos;application (mode bootstrap actif).
+          L&apos;ossature est en place. Renseignez les secrets pour activer l&apos;application (mode bootstrap actif).
         </p>
         <ol className="mt-6 space-y-3">
           {steps.map((s, i) => (

@@ -10,8 +10,13 @@ import { createStarterPipeline } from "./actions";
 // Prospection native (§6) — accessible aux deux rôles.
 export const dynamic = "force-dynamic";
 
-export default async function ProspectionPage() {
+export default async function ProspectionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ prospect?: string }>;
+}) {
   const me = await requireUser();
+  const { prospect } = await searchParams;
 
   const [pipeline, groups] = await Promise.all([
     prisma.pipeline.findFirst({
@@ -60,6 +65,7 @@ export default async function ProspectionPage() {
         <Prospection
           pipelineName={pipeline.name}
           currentUser={{ id: me.id, name: me.name, role: me.role }}
+          initialSelectedId={prospect ?? null}
           initialGroups={groupDTOs}
           initialStages={pipeline.stages.map<StageDTO>((s) => ({
             id: s.id,
