@@ -19,7 +19,7 @@ import {
 } from "@tabler/icons-react";
 import { Logo } from "@/components/Logo";
 import { KpiCard } from "@/components/KpiCard";
-import { RefreshButton } from "@/components/RefreshButton";
+import { SyncButtons } from "@/components/SyncButtons";
 import { euro } from "@/lib/facturation";
 
 export interface CockpitData {
@@ -113,7 +113,7 @@ export function Cockpit({
                 </Link>
               ))}
             </nav>
-            <RefreshButton variant="generic" initialLastSync={data.lastSync} />
+            <SyncButtons initialLastSync={data.lastSync} />
           </div>
         </div>
 

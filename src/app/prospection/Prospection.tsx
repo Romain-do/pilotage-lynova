@@ -180,7 +180,7 @@ export function Prospection({
           </div>
           <div className="flex items-center gap-2">
             {currentUser.role === "DIRIGEANT" && (
-              <RefreshButton variant="generic" initialLastSync={lastSync} />
+              <RefreshButton initialLastSync={lastSync} />
             )}
             <button
               type="button"
