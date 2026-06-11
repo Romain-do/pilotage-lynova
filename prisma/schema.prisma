@@ -243,7 +243,6 @@ model Prospect {
   group        Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   company      String? // société = titre de la carte (ex-`name`, corrigé depuis l'import Trello)
   name         String? // contact (personne) — optionnel ; vidé lors de la bascule company
-  contact      String? // ancien champ contact (inutilisé, conservé pour compat ; vide en base)
   phone        String?
   email        String?
   reminderAt   DateTime?

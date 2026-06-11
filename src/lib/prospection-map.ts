@@ -22,7 +22,6 @@ export function mapProspect(p: ProspectWithComments): ProspectDTO {
     name: p.name,
     company: p.company,
     groupId: p.groupId,
-    contact: p.contact,
     phone: p.phone,
     email: p.email,
     reminderAt: p.reminderAt ? p.reminderAt.toISOString() : null,

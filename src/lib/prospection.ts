@@ -17,7 +17,6 @@ export interface ProspectDTO {
   /** Société = titre de la carte. */
   company: string | null;
   groupId: string | null;
-  contact: string | null;
   phone: string | null;
   email: string | null;
   reminderAt: string | null; // ISO (date)

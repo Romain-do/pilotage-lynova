@@ -138,7 +138,7 @@ export function ListView({
     }
     if (q) {
       list = list.filter((r) =>
-        [r.name, r.company, r.contact, r.phone, r.email, groupsById.get(r.groupId ?? "")?.name]
+        [r.name, r.company, r.phone, r.email, groupsById.get(r.groupId ?? "")?.name]
           .filter(Boolean)
           .some((v) => v!.toLowerCase().includes(q))
       );
