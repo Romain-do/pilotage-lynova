@@ -12,7 +12,9 @@ export interface CommentDTO {
 export interface ProspectDTO {
   id: string;
   stageId: string;
-  name: string;
+  /** Contact (personne) — optionnel. Le titre des cartes est la société (`company`). */
+  name: string | null;
+  /** Société = titre de la carte. */
   company: string | null;
   groupId: string | null;
   contact: string | null;
@@ -42,6 +44,22 @@ export interface GroupDTO {
   id: string;
   name: string;
   color: string | null; // clé de palette (voir groupColor)
+}
+
+// ── Identité prospect : société = titre, contact = sous-titre ──
+
+/** Titre d'affichage d'un prospect = la société. Repli sur le contact, puis libellé générique. */
+export function prospectTitle(p: { company: string | null; name: string | null }): string {
+  return p.company?.trim() || p.name?.trim() || "Société à renseigner";
+}
+
+/**
+ * Sous-titre = le contact (`name`). « Contact à renseigner » s'il est vide.
+ * Renvoie "" si la société manque (le contact sert alors de titre — pas de redite).
+ */
+export function prospectContactLabel(p: { company: string | null; name: string | null }): string {
+  if (!p.company?.trim()) return "";
+  return p.name?.trim() || "Contact à renseigner";
 }
 
 // ── Helpers d'affichage (purs — utilisables serveur & client) ──

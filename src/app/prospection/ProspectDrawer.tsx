@@ -4,11 +4,13 @@ import { useState, useTransition } from "react";
 import {
   isoToDateInput,
   formatDateFR,
+  prospectTitle,
   type ProspectDTO,
   type CurrentUserDTO,
   type GroupDTO,
 } from "@/lib/prospection";
 import { updateProspect, addComment, archiveProspect } from "./actions";
+import { MeetingForm } from "./MeetingForm";
 
 export function ProspectDrawer({
   prospect,
@@ -25,10 +27,9 @@ export function ProspectDrawer({
   onUpdated: (dto: ProspectDTO) => void;
   onArchived: (id: string) => void;
 }) {
-  const [name, setName] = useState(prospect.name);
   const [company, setCompany] = useState(prospect.company ?? "");
+  const [name, setName] = useState(prospect.name ?? ""); // contact (personne), optionnel
   const [groupId, setGroupId] = useState(prospect.groupId ?? "");
-  const [contact, setContact] = useState(prospect.contact ?? "");
   const [phone, setPhone] = useState(prospect.phone ?? "");
   const [email, setEmail] = useState(prospect.email ?? "");
   const [reminderAt, setReminderAt] = useState(isoToDateInput(prospect.reminderAt));
@@ -44,10 +45,9 @@ export function ProspectDrawer({
   function save() {
     const fd = new FormData();
     fd.set("id", prospect.id);
-    fd.set("name", name);
     fd.set("company", company);
+    fd.set("name", name);
     fd.set("groupId", groupId);
-    fd.set("contact", contact);
     fd.set("phone", phone);
     fd.set("email", email);
     fd.set("reminderAt", reminderAt);
@@ -76,7 +76,7 @@ export function ProspectDrawer({
   }
 
   function archive() {
-    if (!confirm(`Archiver « ${prospect.name} » ? (réversible, aucune suppression définitive)`)) return;
+    if (!confirm(`Archiver « ${prospectTitle(prospect)} » ? (réversible, aucune suppression définitive)`)) return;
     startArchive(async () => {
       await archiveProspect(prospect.id);
       onArchived(prospect.id);
@@ -104,21 +104,27 @@ export function ProspectDrawer({
         </div>
 
         <div className="flex-1 space-y-5 px-5 py-5">
-          {/* Identité + deal */}
+          {/* Identité — société = titre (requis), contact = personne (optionnel) */}
           <div className="space-y-3 rounded-xl border border-navy/10 bg-white p-4">
             <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Nom *</label>
-              <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} />
+              <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Société *</label>
+              <input
+                className={inputCls}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Nom de la société (titre de la carte)"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Contact</label>
+              <input
+                className={inputCls}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Personne à contacter (optionnel)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Société</label>
-                <input className={inputCls} value={company} onChange={(e) => setCompany(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Contact</label>
-                <input className={inputCls} value={contact} onChange={(e) => setContact(e.target.value)} />
-              </div>
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Téléphone</label>
                 <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -196,13 +202,17 @@ export function ProspectDrawer({
             <button
               type="button"
               onClick={save}
-              disabled={saving}
+              disabled={saving || !company.trim()}
               className="rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
             >
               {saving ? "Enregistrement…" : "Enregistrer"}
             </button>
+            {!company.trim() && <span className="text-sm text-navy/50">La société est requise.</span>}
             {savedMsg && <span className="text-sm text-emerald-600">{savedMsg}</span>}
           </div>
+
+          {/* RDV Outlook/Teams — DIRIGEANT seul (l'action serveur re-vérifie le rôle, §3) */}
+          {currentUser.role === "DIRIGEANT" && <MeetingForm prospect={prospect} />}
 
           {/* Commentaires */}
           <div className="rounded-xl border border-navy/10 bg-white p-4">

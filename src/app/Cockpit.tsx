@@ -22,6 +22,7 @@ import { LeayaCard } from "@/components/LeayaCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
+import { prospectTitle, prospectContactLabel } from "@/lib/prospection";
 
 export interface CockpitData {
   fyLabel: string;
@@ -45,7 +46,7 @@ export interface CockpitData {
     tauxReussite: number;
     aRencontrer: number;
     aRecontacter: number;
-    recontacter: { id: string; name: string; company: string | null; dateLabel: string }[];
+    recontacter: { id: string; name: string | null; company: string | null; dateLabel: string }[];
   };
   alerts: { tone: "danger" | "warn" | "info"; text: string; href: string }[];
 }
@@ -178,8 +179,10 @@ export function Cockpit({
                       className="group flex items-center gap-2 py-2 transition-colors hover:bg-cloud">
                       <span className="h-1.5 w-1.5 flex-none rounded-full bg-red-500" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-ink">{r.name}</span>
-                        {r.company && <span className="block truncate text-xs text-ink-3">{r.company}</span>}
+                        <span className="block truncate text-sm font-medium text-ink">{prospectTitle(r)}</span>
+                        {prospectContactLabel(r) && (
+                          <span className="block truncate text-xs text-ink-3">{prospectContactLabel(r)}</span>
+                        )}
                       </span>
                       <span className="flex-none text-xs font-medium text-red-600">{r.dateLabel}</span>
                       <IconExternalLink size={14} className="flex-none text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" />

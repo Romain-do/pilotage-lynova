@@ -18,6 +18,8 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   formatDateFR,
   reminderStatus,
+  prospectTitle,
+  prospectContactLabel,
   type ProspectDTO,
   type StageDTO,
 } from "@/lib/prospection";
@@ -160,10 +162,11 @@ function Card({ prospect, onOpen }: { prospect: ProspectDTO; onOpen: (id: string
 function CardContent({ prospect, dragging }: { prospect: ProspectDTO; dragging?: boolean }) {
   const status = reminderStatus(prospect.reminderAt, prospect.reminderDone);
 
+  const contact = prospectContactLabel(prospect);
   return (
     <div className={dragging ? "w-64 rounded-lg border border-cyan bg-white p-3 shadow-lg" : ""}>
-      <p className="text-sm font-medium text-navy">{prospect.name}</p>
-      {prospect.company && <p className="text-xs text-navy/55">{prospect.company}</p>}
+      <p className="text-sm font-medium text-navy">{prospectTitle(prospect)}</p>
+      {contact && <p className="text-xs text-navy/55">{contact}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {prospect.reminderAt && <ReminderBadge status={status} iso={prospect.reminderAt} />}
         {prospect.comments.length > 0 && (
@@ -193,11 +196,11 @@ function AddCard({ stageId, onAdd }: { stageId: string; onAdd: (dto: ProspectDTO
   const [pending, start] = useTransition();
 
   function submit() {
-    const name = value.trim();
-    if (!name) return;
+    const company = value.trim();
+    if (!company) return;
     const fd = new FormData();
     fd.set("stageId", stageId);
-    fd.set("name", name);
+    fd.set("company", company);
     start(async () => {
       const dto = await createProspect(fd);
       if (dto) onAdd(dto);
@@ -231,7 +234,7 @@ function AddCard({ stageId, onAdd }: { stageId: string; onAdd: (dto: ProspectDTO
           }
           if (e.key === "Escape") setOpen(false);
         }}
-        placeholder="Nom du prospect…"
+        placeholder="Société…"
         disabled={pending}
         className="w-full resize-none rounded-lg border border-navy/15 bg-white px-2.5 py-2 text-sm text-navy placeholder:text-navy/40 focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
       />

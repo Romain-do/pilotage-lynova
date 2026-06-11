@@ -7,9 +7,11 @@ import {
   reminderDotClass,
   temperatureBadgeClass,
   dateInDays,
+  prospectTitle,
   type ProspectRow,
   type GroupDTO,
 } from "@/lib/prospection";
+import { InlineDateInput } from "./InlineDateInput";
 
 export function AgendaView({
   rows,
@@ -112,6 +114,7 @@ function Item({
 }) {
   const [reporting, setReporting] = useState(false);
   const status = reminderStatus(row.reminderAt, false);
+  const contact = row.name?.trim() ?? ""; // contact réel seulement (pas de placeholder dans l'agenda)
 
   return (
     <div className="rounded-xl border border-navy/10 bg-white p-3 shadow-sm">
@@ -119,7 +122,7 @@ function Item({
         <button type="button" onClick={() => onOpen(row.id)} className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 flex-none rounded-full ${reminderDotClass(status)}`} />
-            <span className="truncate font-medium text-navy">{row.name}</span>
+            <span className="truncate font-medium text-navy">{prospectTitle(row)}</span>
             <span
               className={`flex-none rounded-full px-2 py-0.5 text-xs font-medium ${temperatureBadgeClass(
                 row.stageKind
@@ -130,6 +133,7 @@ function Item({
           </div>
           <div className="mt-1 flex items-center gap-2 pl-4 text-xs text-navy/55">
             <span>⏰ {formatDateFR(row.reminderAt)}</span>
+            {contact && <span>· {contact}</span>}
             {groupName(row.groupId) && <span>· {groupName(row.groupId)}</span>}
           </div>
         </button>
@@ -151,7 +155,11 @@ function Item({
               Reporter
             </button>
             {reporting && (
-              <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-navy/10 bg-white p-1.5 shadow-lg">
+              <>
+                {/* Clic ailleurs = fermeture propre (le calendrier natif est hors-DOM,
+                    cliquer dedans ne déclenche donc PAS ce backdrop). */}
+                <div className="fixed inset-0 z-10" onClick={() => setReporting(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-navy/10 bg-white p-1.5 shadow-lg">
                 {[
                   { label: "À demain", days: 1 },
                   { label: "Dans 3 jours", days: 3 },
@@ -172,18 +180,20 @@ function Item({
                 ))}
                 <label className="mt-1 block border-t border-navy/10 px-2.5 pt-2 text-xs text-navy/50">
                   Date précise
-                  <input
-                    type="date"
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        onReschedule(row.id, e.target.value);
+                  <InlineDateInput
+                    value=""
+                    onSelect={(date) => {
+                      if (date) {
+                        onReschedule(row.id, date);
                         setReporting(false);
                       }
                     }}
+                    ariaLabel={`Reporter ${prospectTitle(row)} à une date précise`}
                     className="mt-1 w-full rounded-md border border-navy/15 px-2 py-1 text-sm text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
                   />
                 </label>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -3,13 +3,19 @@ import { Logo } from "@/components/Logo";
 import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { InviteForm } from "./InviteForm";
+import { MsGraphCard } from "./MsGraphCard";
 import { UserRow, type AdminUser } from "./UserRow";
 
 // Écran d'administration — DIRIGEANT seul (garde côté serveur, §3).
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ msgraph?: string }>;
+}) {
   const me = await requireDirigeant();
+  const { msgraph } = await searchParams;
 
   const users = (await prisma.user.findMany({
     orderBy: [{ active: "desc" }, { role: "asc" }, { createdAt: "asc" }],
@@ -54,6 +60,9 @@ export default async function AdminPage() {
             <InviteForm />
           </div>
         </div>
+
+        {/* Intégration agenda Microsoft 365 */}
+        <MsGraphCard notice={msgraph} />
 
         {/* Liste */}
         <div className="mt-8 overflow-hidden rounded-xl border border-navy/10 bg-white shadow-sm">

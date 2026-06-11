@@ -26,13 +26,13 @@ function parseDate(v: FormDataEntryValue | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Création rapide d'un prospect (saisie du nom dans une colonne). */
+/** Création rapide d'un prospect (saisie de la SOCIÉTÉ = titre, dans une colonne). */
 export async function createProspect(formData: FormData): Promise<ProspectDTO | null> {
   const me = await requireUser();
 
   const stageId = str(formData.get("stageId"), 64);
-  const name = str(formData.get("name"), 200);
-  if (!stageId || !name) return null;
+  const company = str(formData.get("company"), 200);
+  if (!stageId || !company) return null;
 
   // Position : à la fin de la colonne.
   const last = await prisma.prospect.findFirst({
@@ -44,7 +44,7 @@ export async function createProspect(formData: FormData): Promise<ProspectDTO | 
   const created = await prisma.prospect.create({
     data: {
       stageId,
-      name,
+      company,
       position: (last?.position ?? 0) + STEP,
       createdById: me.id,
     },
@@ -60,16 +60,15 @@ export async function updateProspect(formData: FormData): Promise<ProspectDTO | 
   await requireUser();
 
   const id = str(formData.get("id"), 64);
-  const name = str(formData.get("name"), 200);
-  if (!id || !name) return null;
+  const company = str(formData.get("company"), 200); // société = titre, requis
+  if (!id || !company) return null;
 
   const updated = await prisma.prospect.update({
     where: { id },
     data: {
-      name,
-      company: str(formData.get("company"), 200),
+      company,
+      name: str(formData.get("name"), 200), // contact (personne), optionnel
       groupId: str(formData.get("groupId"), 64),
-      contact: str(formData.get("contact"), 200),
       phone: str(formData.get("phone"), 50),
       email: str(formData.get("email"), 200),
       notes: str(formData.get("notes"), 5000),

@@ -21,12 +21,15 @@ import {
   temperatureDotClass,
   categoryOf,
   groupColor,
+  prospectTitle,
+  prospectContactLabel,
   type KpiCategory,
   type ProspectRow,
   type GroupDTO,
   type CurrentUserDTO,
 } from "@/lib/prospection";
 import type { StageLite } from "./Prospection";
+import { InlineDateInput } from "./InlineDateInput";
 
 type SortKey = "name" | "stage" | "reminder";
 type SortDir = "asc" | "desc";
@@ -359,20 +362,19 @@ export function ListView({
                   <button type="button" onClick={() => onOpen(r.id)} className="block w-full text-left">
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 flex-none rounded-full ${reminderDotClass(status)}`} />
-                      <span className="truncate text-sm font-medium text-navy">{r.name}</span>
+                      <span className="truncate text-sm font-medium text-navy">{prospectTitle(r)}</span>
                     </div>
                     <ContactLine row={r} className="mt-1 pl-4" />
                   </button>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-4">
-                    <input
-                      type="date"
+                    <InlineDateInput
                       value={isoToDateInput(r.reminderAt)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => onSetReminder(r.id, e.target.value || null)}
+                      onSelect={(date) => onSetReminder(r.id, date)}
+                      ariaLabel={`Modifier le rappel de ${prospectTitle(r)}`}
                       className="rounded-md border border-navy/15 bg-white px-2 py-1 text-xs text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
                     />
                     <StatusBadgeMenu row={r} stages={stages} onChange={(sid) => onChangeStage(r.id, sid)} />
-                    {isDirigeant && <DeleteBtn name={r.name} onDelete={() => onDeleteProspect(r.id)} />}
+                    {isDirigeant && <DeleteBtn name={prospectTitle(r)} onDelete={() => onDeleteProspect(r.id)} />}
                   </div>
                 </div>
               );
@@ -472,11 +474,11 @@ function Row({
           checked={checked}
           onChange={onToggle}
           className="h-4 w-4 rounded border-navy/30 text-navy focus:ring-cyan"
-          aria-label={`Sélectionner ${row.name}`}
+          aria-label={`Sélectionner ${prospectTitle(row)}`}
         />
       </td>
       <td className="cursor-pointer px-4 py-3" onClick={() => onOpen(row.id)}>
-        <div className="font-medium text-navy">{row.name}</div>
+        <div className="font-medium text-navy">{prospectTitle(row)}</div>
         <ContactLine row={row} className="mt-0.5" />
       </td>
       <td className="px-4 py-3">
@@ -493,19 +495,18 @@ function Row({
             <span className={status === "done" ? "text-navy/40 line-through" : ""}>{formatDateFR(row.reminderAt)}</span>
           </button>
         ) : (
-          <input
-            type="date"
+          <InlineDateInput
             value=""
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => e.target.value && onSetReminder(row.id, e.target.value)}
-            className="rounded-md border border-navy/15 bg-white px-2 py-1 text-xs text-navy/50 focus:border-cyan focus:text-navy focus:outline-none focus:ring-2 focus:ring-cyan/40"
+            onSelect={(date) => date && onSetReminder(row.id, date)}
             title="Planifier un rappel"
+            ariaLabel={`Planifier un rappel pour ${prospectTitle(row)}`}
+            className="rounded-md border border-navy/15 bg-white px-2 py-1 text-xs text-navy/50 focus:border-cyan focus:text-navy focus:outline-none focus:ring-2 focus:ring-cyan/40"
           />
         )}
       </td>
       {isDirigeant && (
         <td className="w-12 px-3 py-3 text-right">
-          <DeleteBtn name={row.name} onDelete={() => onDeleteProspect(row.id)} />
+          <DeleteBtn name={prospectTitle(row)} onDelete={() => onDeleteProspect(row.id)} />
         </td>
       )}
     </tr>
@@ -513,11 +514,14 @@ function Row({
 }
 
 function ContactLine({ row, className = "" }: { row: ProspectRow; className?: string }) {
-  const text = [row.company, row.contact].filter(Boolean).join(" · ");
-  if (!text && !row.phone) return null;
+  const contact = prospectContactLabel(row); // contact (name), ou « Contact à renseigner »
+  const isPlaceholder = contact !== "" && !row.name?.trim();
+  if (!contact && !row.phone) return null;
   return (
     <div className={`flex items-center gap-2 text-xs text-navy/50 ${className}`}>
-      {text && <span className="truncate">{text}</span>}
+      {contact && (
+        <span className={`truncate ${isPlaceholder ? "italic text-navy/35" : ""}`}>{contact}</span>
+      )}
       {row.phone && (
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
           <IconPhone size={12} stroke={2} className="text-navy/35" />
@@ -646,7 +650,7 @@ function Th({
 function compare(a: ProspectRow, b: ProspectRow, key: SortKey): number {
   switch (key) {
     case "name":
-      return a.name.localeCompare(b.name, "fr");
+      return prospectTitle(a).localeCompare(prospectTitle(b), "fr");
     case "stage":
       return a.stageName.localeCompare(b.stageName, "fr");
     case "reminder": {

@@ -181,6 +181,25 @@ model SyncState {
   @@map("sync_state")
 }
 
+// ───────────────────────── Microsoft 365 / Graph (RDV Outlook+Teams) ─────────────────────────
+// Connexion OAuth au calendrier Microsoft 365 du dirigeant. Le refresh token est un SECRET
+// long terme stocké CÔTÉ SERVEUR uniquement (jamais exposé au client). Table singleton
+// (un seul agenda connecté). RLS « deny by default » dans la migration — l'app y accède
+// exclusivement via Prisma (rôle propriétaire), comme les autres tables.
+
+model MsGraphConnection {
+  id            String   @id @default("default") // singleton : une seule ligne ("default")
+  refreshToken  String // SECRET — token de rafraîchissement OAuth (offline_access)
+  accountEmail  String? // identité du compte connecté (scope User.Read)
+  accountName   String?
+  scope         String? // scopes effectivement accordés
+  connectedById String?  @db.Uuid // app_user.id du dirigeant ayant connecté
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("msgraph_connection")
+}
+
 // ───────────────────────── Prospection native (§6) ─────────────────────────
 // Remplace Trello. Accessible aux deux rôles (lecture + écriture). Pas de
 // suppression physique : archivage logique (`archived`). Labels & journal
@@ -222,9 +241,9 @@ model Prospect {
   stage        Stage     @relation(fields: [stageId], references: [id], onDelete: Cascade)
   groupId      String?   @db.Uuid
   group        Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  name         String
-  company      String?
-  contact      String?
+  company      String? // société = titre de la carte (ex-`name`, corrigé depuis l'import Trello)
+  name         String? // contact (personne) — optionnel ; vidé lors de la bascule company
+  contact      String? // ancien champ contact (inutilisé, conservé pour compat ; vide en base)
   phone        String?
   email        String?
   reminderAt   DateTime?
