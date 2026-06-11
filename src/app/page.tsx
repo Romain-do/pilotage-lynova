@@ -71,7 +71,7 @@ async function buildCockpitData(): Promise<CockpitData> {
       include: {
         stages: {
           orderBy: { position: "asc" },
-          include: { prospects: { where: { archived: false }, select: { id: true, name: true, company: true, reminderAt: true, reminderDone: true } } },
+          include: { prospects: { where: { archived: false }, select: { id: true, company: true, genre: true, nom: true, prenom: true, reminderAt: true, reminderDone: true } } },
         },
       },
     }),
@@ -120,7 +120,7 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   // ── Prospection (définitions identiques à la liste) ──
   const rows = (pipeline?.stages ?? []).flatMap((s) =>
-    s.prospects.map((pr) => ({ id: pr.id, name: pr.name, company: pr.company, reminderAt: pr.reminderAt, reminderDone: pr.reminderDone, kind: s.kind }))
+    s.prospects.map((pr) => ({ id: pr.id, company: pr.company, genre: pr.genre, nom: pr.nom, prenom: pr.prenom, reminderAt: pr.reminderAt, reminderDone: pr.reminderDone, kind: s.kind }))
   );
   const counts: Record<KpiCategory, number> = { a_rencontrer: 0, rencontres: 0, a_installer: 0, installes: 0, refus: 0 };
   for (const r of rows) {
@@ -143,8 +143,10 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   const recontacter = overdue.slice(0, 6).map((r) => ({
     id: r.id,
-    name: r.name,
     company: r.company,
+    genre: r.genre,
+    nom: r.nom,
+    prenom: r.prenom,
     dateLabel: formatDateFR(r.reminderAt!.toISOString()) ?? "",
   }));
 

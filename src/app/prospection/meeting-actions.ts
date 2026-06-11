@@ -1,9 +1,12 @@
 "use server";
 
 import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 import { requireDirigeant } from "@/lib/auth";
 import { isMsGraphConnected } from "@/lib/msgraph/auth";
 import { createCalendarEvent, GraphError } from "@/lib/msgraph/graph";
+import { sendMail } from "@/lib/msgraph/mail";
+import { meetingNotificationEmail, MEETING_NOTIFY_TO } from "@/lib/email/templates";
 
 // Server action de création d'un RDV Outlook/Teams (§ RDV prospect). DIRIGEANT seul :
 // l'événement est créé dans le calendrier connecté et les invitations partent depuis ce
@@ -18,6 +21,7 @@ export interface MeetingActionState {
 
 const meetingSchema = z
   .object({
+    prospectId: z.string().min(1),
     subject: z.string().trim().min(1, "Objet requis").max(255),
     prospectEmail: z.string().trim().toLowerCase().email("E-mail prospect invalide"),
     additionalEmails: z
@@ -76,12 +80,38 @@ export async function createMeeting(input: MeetingInput): Promise<MeetingActionS
       locationDisplayName: data.mode === "physique" ? data.address : null,
     });
 
+    // Notification interne → support@lynova.net (F). N'échoue PAS le RDV si le mail rate.
+    let notifyWarning = "";
+    try {
+      const prospect = await prisma.prospect.findUnique({
+        where: { id: data.prospectId },
+        select: { company: true, genre: true, nom: true, prenom: true, email: true },
+      });
+      const notif = meetingNotificationEmail({
+        company: prospect?.company ?? null,
+        genre: prospect?.genre ?? null,
+        nom: prospect?.nom ?? null,
+        prenom: prospect?.prenom ?? null,
+        email: prospect?.email ?? data.prospectEmail,
+        dateISO: data.date,
+        time: data.time,
+        durationMinutes: data.durationMinutes,
+        mode: data.mode,
+        address: data.address ?? null,
+        joinUrl: event.joinUrl,
+      });
+      await sendMail({ subject: notif.subject, html: notif.html, to: [MEETING_NOTIFY_TO] });
+    } catch (e) {
+      console.error("[msgraph] notif RDV:", e instanceof Error ? e.message : e);
+      notifyWarning = ` (notification ${MEETING_NOTIFY_TO} non envoyée)`;
+    }
+
     return {
       ok: true,
       message:
-        data.mode === "visio"
+        (data.mode === "visio"
           ? "RDV Teams créé et invitations envoyées."
-          : "RDV créé et invitations envoyées.",
+          : "RDV créé et invitations envoyées.") + notifyWarning,
       webLink: event.webLink ?? undefined,
       joinUrl: event.joinUrl ?? undefined,
     };

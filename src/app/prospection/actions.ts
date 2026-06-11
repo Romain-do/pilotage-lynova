@@ -63,11 +63,14 @@ export async function updateProspect(formData: FormData): Promise<ProspectDTO | 
   const company = str(formData.get("company"), 200); // société = titre, requis
   if (!id || !company) return null;
 
+  const genreRaw = str(formData.get("genre"), 10);
   const updated = await prisma.prospect.update({
     where: { id },
     data: {
       company,
-      name: str(formData.get("name"), 200), // contact (personne), optionnel
+      genre: genreRaw === "Mr" || genreRaw === "Mme" ? genreRaw : null, // contact : civilité
+      nom: str(formData.get("nom"), 120),
+      prenom: str(formData.get("prenom"), 120),
       groupId: str(formData.get("groupId"), 64),
       phone: str(formData.get("phone"), 50),
       email: str(formData.get("email"), 200),

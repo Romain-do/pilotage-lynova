@@ -19,8 +19,10 @@ export function mapProspect(p: ProspectWithComments): ProspectDTO {
   return {
     id: p.id,
     stageId: p.stageId,
-    name: p.name,
     company: p.company,
+    genre: p.genre,
+    nom: p.nom,
+    prenom: p.prenom,
     groupId: p.groupId,
     phone: p.phone,
     email: p.email,

@@ -29,7 +29,7 @@ import {
   type CurrentUserDTO,
 } from "@/lib/prospection";
 import type { StageLite } from "./Prospection";
-import { InlineDateInput } from "./InlineDateInput";
+import { DateSelect } from "./DateSelect";
 
 type SortKey = "name" | "stage" | "reminder";
 type SortDir = "asc" | "desc";
@@ -138,7 +138,7 @@ export function ListView({
     }
     if (q) {
       list = list.filter((r) =>
-        [r.name, r.company, r.phone, r.email, groupsById.get(r.groupId ?? "")?.name]
+        [r.company, r.prenom, r.nom, r.phone, r.email, groupsById.get(r.groupId ?? "")?.name]
           .filter(Boolean)
           .some((v) => v!.toLowerCase().includes(q))
       );
@@ -367,11 +367,11 @@ export function ListView({
                     <ContactLine row={r} className="mt-1 pl-4" />
                   </button>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-4">
-                    <InlineDateInput
+                    <DateSelect
                       value={isoToDateInput(r.reminderAt)}
-                      onSelect={(date) => onSetReminder(r.id, date)}
+                      onChange={(date) => onSetReminder(r.id, date || null)}
                       ariaLabel={`Modifier le rappel de ${prospectTitle(r)}`}
-                      className="rounded-md border border-navy/15 bg-white px-2 py-1 text-xs text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
+                      selectClassName="rounded-md border border-navy/15 bg-white px-1.5 py-1 text-xs text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
                     />
                     <StatusBadgeMenu row={r} stages={stages} onChange={(sid) => onChangeStage(r.id, sid)} />
                     {isDirigeant && <DeleteBtn name={prospectTitle(r)} onDelete={() => onDeleteProspect(r.id)} />}
@@ -495,12 +495,11 @@ function Row({
             <span className={status === "done" ? "text-navy/40 line-through" : ""}>{formatDateFR(row.reminderAt)}</span>
           </button>
         ) : (
-          <InlineDateInput
+          <DateSelect
             value=""
-            onSelect={(date) => date && onSetReminder(row.id, date)}
-            title="Planifier un rappel"
+            onChange={(date) => date && onSetReminder(row.id, date)}
             ariaLabel={`Planifier un rappel pour ${prospectTitle(row)}`}
-            className="rounded-md border border-navy/15 bg-white px-2 py-1 text-xs text-navy/50 focus:border-cyan focus:text-navy focus:outline-none focus:ring-2 focus:ring-cyan/40"
+            selectClassName="rounded-md border border-navy/15 bg-white px-1.5 py-1 text-xs text-navy/70 focus:border-cyan focus:text-navy focus:outline-none focus:ring-2 focus:ring-cyan/40"
           />
         )}
       </td>
@@ -514,8 +513,8 @@ function Row({
 }
 
 function ContactLine({ row, className = "" }: { row: ProspectRow; className?: string }) {
-  const contact = prospectContactLabel(row); // contact (name), ou « Contact à renseigner »
-  const isPlaceholder = contact !== "" && !row.name?.trim();
+  const contact = prospectContactLabel(row); // « Prénom Nom » ou « Contact à renseigner »
+  const isPlaceholder = !row.prenom?.trim() && !row.nom?.trim();
   if (!contact && !row.phone) return null;
   return (
     <div className={`flex items-center gap-2 text-xs text-navy/50 ${className}`}>

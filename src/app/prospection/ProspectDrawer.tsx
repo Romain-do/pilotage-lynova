@@ -11,6 +11,8 @@ import {
 } from "@/lib/prospection";
 import { updateProspect, addComment, archiveProspect } from "./actions";
 import { MeetingForm } from "./MeetingForm";
+import { DateSelect } from "./DateSelect";
+import { PresentationEmail } from "./PresentationEmail";
 
 export function ProspectDrawer({
   prospect,
@@ -28,7 +30,9 @@ export function ProspectDrawer({
   onArchived: (id: string) => void;
 }) {
   const [company, setCompany] = useState(prospect.company ?? "");
-  const [name, setName] = useState(prospect.name ?? ""); // contact (personne), optionnel
+  const [genre, setGenre] = useState(prospect.genre ?? ""); // contact : "Mr" | "Mme" | ""
+  const [nom, setNom] = useState(prospect.nom ?? "");
+  const [prenom, setPrenom] = useState(prospect.prenom ?? "");
   const [groupId, setGroupId] = useState(prospect.groupId ?? "");
   const [phone, setPhone] = useState(prospect.phone ?? "");
   const [email, setEmail] = useState(prospect.email ?? "");
@@ -46,7 +50,9 @@ export function ProspectDrawer({
     const fd = new FormData();
     fd.set("id", prospect.id);
     fd.set("company", company);
-    fd.set("name", name);
+    fd.set("genre", genre);
+    fd.set("nom", nom);
+    fd.set("prenom", prenom);
     fd.set("groupId", groupId);
     fd.set("phone", phone);
     fd.set("email", email);
@@ -115,13 +121,33 @@ export function ProspectDrawer({
                 placeholder="Nom de la société (titre de la carte)"
               />
             </div>
+            {/* Contact (personne) : civilité + nom + prénom — optionnel */}
+            <div className="grid grid-cols-[5.5rem_1fr] gap-3">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Genre</label>
+                <select className={inputCls} value={genre} onChange={(e) => setGenre(e.target.value)}>
+                  <option value="">—</option>
+                  <option value="Mr">Mr</option>
+                  <option value="Mme">Mme</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Nom</label>
+                <input
+                  className={inputCls}
+                  value={nom}
+                  onChange={(e) => setNom(e.target.value)}
+                  placeholder="Nom du contact"
+                />
+              </div>
+            </div>
             <div>
-              <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Contact</label>
+              <label className="text-xs font-medium uppercase tracking-wide text-navy/50">Prénom</label>
               <input
                 className={inputCls}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Personne à contacter (optionnel)"
+                value={prenom}
+                onChange={(e) => setPrenom(e.target.value)}
+                placeholder="Prénom du contact"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -158,13 +184,8 @@ export function ProspectDrawer({
             <label className="text-xs font-medium uppercase tracking-wide text-navy/50">
               Date de rappel
             </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="date"
-                className={`${inputCls} mt-0`}
-                value={reminderAt}
-                onChange={(e) => setReminderAt(e.target.value)}
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <DateSelect value={reminderAt} onChange={setReminderAt} ariaLabel="Date de rappel" />
               {reminderAt && (
                 <button
                   type="button"
@@ -211,8 +232,13 @@ export function ProspectDrawer({
             {savedMsg && <span className="text-sm text-emerald-600">{savedMsg}</span>}
           </div>
 
-          {/* RDV Outlook/Teams — DIRIGEANT seul (l'action serveur re-vérifie le rôle, §3) */}
-          {currentUser.role === "DIRIGEANT" && <MeetingForm prospect={prospect} />}
+          {/* E-mails Outlook — DIRIGEANT seul (les actions serveur re-vérifient le rôle, §3) */}
+          {currentUser.role === "DIRIGEANT" && (
+            <>
+              <PresentationEmail prospect={prospect} />
+              <MeetingForm prospect={prospect} />
+            </>
+          )}
 
           {/* Commentaires */}
           <div className="rounded-xl border border-navy/10 bg-white p-4">

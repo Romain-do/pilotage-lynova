@@ -12,10 +12,12 @@ export interface CommentDTO {
 export interface ProspectDTO {
   id: string;
   stageId: string;
-  /** Contact (personne) — optionnel. Le titre des cartes est la société (`company`). */
-  name: string | null;
   /** Société = titre de la carte. */
   company: string | null;
+  /** Contact (personne) — optionnel. genre = « Mr » | « Mme ». */
+  genre: string | null;
+  nom: string | null;
+  prenom: string | null;
   groupId: string | null;
   phone: string | null;
   email: string | null;
@@ -45,20 +47,21 @@ export interface GroupDTO {
   color: string | null; // clé de palette (voir groupColor)
 }
 
-// ── Identité prospect : société = titre, contact = sous-titre ──
+// ── Identité prospect : société = titre, contact (Prénom Nom) = sous-titre ──
 
-/** Titre d'affichage d'un prospect = la société. Repli sur le contact, puis libellé générique. */
-export function prospectTitle(p: { company: string | null; name: string | null }): string {
-  return p.company?.trim() || p.name?.trim() || "Société à renseigner";
+/** Titre d'affichage d'un prospect = la société (inchangé). */
+export function prospectTitle(p: { company: string | null }): string {
+  return p.company?.trim() || "Société à renseigner";
 }
 
-/**
- * Sous-titre = le contact (`name`). « Contact à renseigner » s'il est vide.
- * Renvoie "" si la société manque (le contact sert alors de titre — pas de redite).
- */
-export function prospectContactLabel(p: { company: string | null; name: string | null }): string {
-  if (!p.company?.trim()) return "";
-  return p.name?.trim() || "Contact à renseigner";
+/** « Prénom Nom » si renseigné, sinon "" (usage compact : agenda, cockpit). */
+export function prospectContactName(p: { prenom: string | null; nom: string | null }): string {
+  return [p.prenom?.trim(), p.nom?.trim()].filter(Boolean).join(" ");
+}
+
+/** Sous-titre des cartes/lignes : « Prénom Nom », sinon « Contact à renseigner ». */
+export function prospectContactLabel(p: { prenom: string | null; nom: string | null }): string {
+  return prospectContactName(p) || "Contact à renseigner";
 }
 
 // ── Helpers d'affichage (purs — utilisables serveur & client) ──

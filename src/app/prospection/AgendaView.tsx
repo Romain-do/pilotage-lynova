@@ -8,10 +8,11 @@ import {
   temperatureBadgeClass,
   dateInDays,
   prospectTitle,
+  prospectContactName,
   type ProspectRow,
   type GroupDTO,
 } from "@/lib/prospection";
-import { InlineDateInput } from "./InlineDateInput";
+import { DateSelect } from "./DateSelect";
 
 export function AgendaView({
   rows,
@@ -114,7 +115,7 @@ function Item({
 }) {
   const [reporting, setReporting] = useState(false);
   const status = reminderStatus(row.reminderAt, false);
-  const contact = row.name?.trim() ?? ""; // contact réel seulement (pas de placeholder dans l'agenda)
+  const contact = prospectContactName(row); // « Prénom Nom » réel (pas de placeholder dans l'agenda)
 
   return (
     <div className="rounded-xl border border-navy/10 bg-white p-3 shadow-sm">
@@ -178,20 +179,22 @@ function Item({
                     {opt.label}
                   </button>
                 ))}
-                <label className="mt-1 block border-t border-navy/10 px-2.5 pt-2 text-xs text-navy/50">
-                  Date précise
-                  <InlineDateInput
-                    value=""
-                    onSelect={(date) => {
-                      if (date) {
-                        onReschedule(row.id, date);
-                        setReporting(false);
-                      }
-                    }}
-                    ariaLabel={`Reporter ${prospectTitle(row)} à une date précise`}
-                    className="mt-1 w-full rounded-md border border-navy/15 px-2 py-1 text-sm text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
-                  />
-                </label>
+                <div className="mt-1 border-t border-navy/10 px-2.5 pt-2">
+                  <span className="text-xs text-navy/50">Date précise</span>
+                  <div className="mt-1">
+                    <DateSelect
+                      value=""
+                      onChange={(date) => {
+                        if (date) {
+                          onReschedule(row.id, date);
+                          setReporting(false);
+                        }
+                      }}
+                      ariaLabel={`Reporter ${prospectTitle(row)} à une date précise`}
+                      selectClassName="rounded-md border border-navy/15 bg-white px-1.5 py-1 text-xs text-navy focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
+                    />
+                  </div>
+                </div>
                 </div>
               </>
             )}

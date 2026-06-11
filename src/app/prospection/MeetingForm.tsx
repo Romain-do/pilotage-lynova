@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { ProspectDTO } from "@/lib/prospection";
 import { createMeeting, type MeetingActionState } from "./meeting-actions";
+import { DateSelect } from "./DateSelect";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,7 +13,7 @@ const labelCls = "text-xs font-medium uppercase tracking-wide text-navy/50";
 
 /** Objet auto « Lynova x {société} : Démonstration ». */
 function defaultSubject(prospect: ProspectDTO): string {
-  return `Lynova x ${prospect.company || prospect.name} : Démonstration`;
+  return `Lynova x ${prospect.company?.trim() || "votre structure"} : Démonstration`;
 }
 
 export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
@@ -51,6 +52,7 @@ export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
     setResult(null);
     start(async () => {
       const state = await createMeeting({
+        prospectId: prospect.id,
         subject,
         prospectEmail,
         additionalEmails: extraEmails,
@@ -190,17 +192,14 @@ export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
         </div>
       )}
 
-      {/* Date / heure / durée */}
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className={labelCls}>Date</label>
-          <input
-            className={inputCls}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+      {/* Date (3 listes) puis heure + durée */}
+      <div>
+        <label className={labelCls}>Date</label>
+        <div className="mt-1">
+          <DateSelect value={date} onChange={setDate} ariaLabel="Date du RDV" />
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={labelCls}>Heure</label>
           <input

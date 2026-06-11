@@ -268,7 +268,7 @@ async function main() {
         data: {
           stageId: sid,
           groupId: gid,
-          name: c.name.slice(0, 200),
+          company: c.name.slice(0, 200), // le nom de carte Trello = la société (= titre)
           notes: c.desc ? c.desc.slice(0, 5000) : null,
           reminderAt: c.due ? new Date(c.due) : null,
           reminderDone: c.dueComplete ?? false,

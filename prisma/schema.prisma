@@ -242,7 +242,9 @@ model Prospect {
   groupId      String?   @db.Uuid
   group        Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   company      String? // société = titre de la carte (ex-`name`, corrigé depuis l'import Trello)
-  name         String? // contact (personne) — optionnel ; vidé lors de la bascule company
+  genre        String? // civilité du contact : "Mr" | "Mme"
+  nom          String? // nom du contact (personne)
+  prenom       String? // prénom du contact
   phone        String?
   email        String?
   reminderAt   DateTime?

@@ -132,8 +132,7 @@ async function main() {
       data: {
         stageId: stage(d.stageName),
         groupId: d.group ? groupIdByName.get(d.group) ?? null : null,
-        name: d.name,
-        company: d.company ?? null,
+        company: d.company ?? d.name, // la « société » = titre (d.name sert de repli démo)
         phone: d.phone ?? null,
         email: d.email ?? null,
         reminderAt: d.reminderAt ?? null,
