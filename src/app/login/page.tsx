@@ -3,21 +3,11 @@ import { Logo } from "@/components/Logo";
 import { getCurrentUser } from "@/lib/auth";
 import { LoginForm } from "./LoginForm";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function LoginPage() {
   // Déjà connecté (profil valide) → vers l'accueil. Évite aussi toute boucle de redirection.
   if (await getCurrentUser()) {
     redirect("/");
   }
-
-  const { error } = await searchParams;
-  const notice =
-    error === "auth"
-      ? "Lien invalide ou expiré. Demandez un nouveau lien de connexion."
-      : undefined;
 
   return (
     <main className="flex flex-1 items-center justify-center bg-navy px-6 py-16">
@@ -29,10 +19,10 @@ export default async function LoginPage({
           Connexion au cockpit
         </h1>
         <p className="mt-2 text-center text-sm text-navy/60">
-          Accès par lien magique, sans mot de passe.
+          Accès par code à usage unique, sans mot de passe.
         </p>
 
-        <LoginForm notice={notice} />
+        <LoginForm />
       </div>
     </main>
   );
