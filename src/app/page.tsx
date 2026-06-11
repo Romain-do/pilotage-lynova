@@ -200,7 +200,7 @@ async function buildCockpitData(): Promise<CockpitData> {
 function NotConfigured() {
   const steps = [
     "Créer un projet Supabase puis remplir DATABASE_URL et DIRECT_URL dans .env.local.",
-    "Renseigner NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY.",
+    "Renseigner NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY et SUPABASE_SECRET_KEY.",
     "Lancer `npm run db:migrate` pour créer le schéma.",
     "Lancer `npm run seed:users` pour créer le compte dirigeant.",
     "Redémarrer `npm run dev` : l'authentification et le cloisonnement s'activent.",

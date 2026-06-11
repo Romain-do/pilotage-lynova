@@ -7,7 +7,7 @@
  * Lancer :  npm run seed:users
  *
  * Variables (depuis .env.local) :
- *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (requis)
+ *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY   (requis)
  *   SEED_DIRIGEANT_EMAIL   (défaut: romain@lynova.net)
  *   SEED_DIRIGEANT_NAME    (défaut: Romain)
  *   SEED_COMMERCIAL_EMAIL  (optionnel — ex. l'adresse de Méganne)
@@ -20,16 +20,16 @@ import { createClient, type User } from "@supabase/supabase-js";
 import { PrismaClient, Role } from "@prisma/client";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-if (!url || !serviceKey) {
+if (!url || !secretKey) {
   console.error(
-    "ERREUR : NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis dans .env.local."
+    "ERREUR : NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SECRET_KEY sont requis dans .env.local."
   );
   process.exit(1);
 }
 
-const admin = createClient(url, serviceKey, {
+const admin = createClient(url, secretKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 const prisma = new PrismaClient();
