@@ -16,12 +16,14 @@ export function msAuthority(): string {
  * - User.Read                 → identité du compte connecté (e-mail affiché dans /admin)
  * - Calendars.ReadWrite       → création d'événements (POST /me/events)
  * - OnlineMeetings.ReadWrite  → réunion Teams attachée à l'événement
+ * - Mail.Send                 → envoi d'e-mails (POST /me/sendMail : présentation, notif RDV)
  */
 export const MS_SCOPES = [
   "offline_access",
   "User.Read",
   "Calendars.ReadWrite",
   "OnlineMeetings.ReadWrite",
+  "Mail.Send",
 ] as const;
 
 export const MS_SCOPE_STRING = MS_SCOPES.join(" ");
