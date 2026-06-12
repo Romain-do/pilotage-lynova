@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireDirigeant } from "@/lib/auth";
 import type { ProspectDTO, CommentDTO, GroupDTO } from "@/lib/prospection";
@@ -24,6 +24,16 @@ function parseDate(v: FormDataEntryValue | null): Date | null {
   if (typeof v !== "string" || !v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Invalide la prospection après une mutation. `updateTag` (read-your-own-writes, server
+ * action) rafraîchit immédiatement les caches getProspectionBoard / getCockpitProspection
+ * (tag "prospection") ; `revalidatePath` purge en plus le cache de la route /prospection.
+ */
+function bumpProspection(): void {
+  updateTag("prospection");
+  revalidatePath("/prospection");
 }
 
 /** Création rapide d'un prospect (saisie de la SOCIÉTÉ = titre, dans une colonne). */
@@ -51,7 +61,7 @@ export async function createProspect(formData: FormData): Promise<ProspectDTO | 
     include: { comments: true },
   });
 
-  revalidatePath("/prospection");
+  bumpProspection();
   return mapProspect(created);
 }
 
@@ -81,7 +91,7 @@ export async function updateProspect(formData: FormData): Promise<ProspectDTO | 
     include: { comments: true },
   });
 
-  revalidatePath("/prospection");
+  bumpProspection();
   return mapProspect(updated);
 }
 
@@ -117,7 +127,7 @@ export async function moveProspect(
     where: { id: prospectId },
     data: { stageId: toStageId, position: newPos },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
 }
 
 /** Ajoute un commentaire horodaté et signé. */
@@ -135,7 +145,7 @@ export async function addComment(prospectId: string, body: string): Promise<Comm
     },
   });
 
-  revalidatePath("/prospection");
+  bumpProspection();
   return mapComment(created);
 }
 
@@ -150,7 +160,7 @@ export async function toggleReminderDone(
     data: { reminderDone: done },
     include: { comments: true },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
   return mapProspect(updated);
 }
 
@@ -167,7 +177,7 @@ export async function setReminder(
     data: { reminderAt, reminderDone: false },
     include: { comments: true },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
   return mapProspect(updated);
 }
 
@@ -175,7 +185,7 @@ export async function setReminder(
 export async function archiveProspect(prospectId: string): Promise<void> {
   await requireUser();
   await prisma.prospect.update({ where: { id: prospectId }, data: { archived: true } });
-  revalidatePath("/prospection");
+  bumpProspection();
 }
 
 /**
@@ -187,7 +197,7 @@ export async function archiveProspect(prospectId: string): Promise<void> {
 export async function deleteProspect(prospectId: string): Promise<void> {
   await requireDirigeant();
   await prisma.prospect.update({ where: { id: prospectId }, data: { archived: true } });
-  revalidatePath("/prospection");
+  bumpProspection();
 }
 
 /** Crée un pipeline de démarrage (les 7 statuts) quand aucun n'existe. */
@@ -214,7 +224,7 @@ export async function createStarterPipeline(): Promise<void> {
       stages: { create: starterStages.map((s, i) => ({ ...s, position: i })) },
     },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
 }
 
 // ───────────────────────── Groupes ─────────────────────────
@@ -225,7 +235,7 @@ export async function createGroup(name: string, color: string | null): Promise<G
   const clean = name.trim();
   if (!clean) return null;
   const g = await prisma.group.create({ data: { name: clean.slice(0, 120), color } });
-  revalidatePath("/prospection");
+  bumpProspection();
   return { id: g.id, name: g.name, color: g.color };
 }
 
@@ -242,7 +252,7 @@ export async function updateGroup(
     where: { id },
     data: { name: clean.slice(0, 120), color },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
   return { id: g.id, name: g.name, color: g.color };
 }
 
@@ -250,7 +260,7 @@ export async function updateGroup(
 export async function deleteGroup(id: string): Promise<void> {
   await requireUser();
   await prisma.group.delete({ where: { id } }); // onDelete: SetNull côté prospect
-  revalidatePath("/prospection");
+  bumpProspection();
 }
 
 /** Assigne (ou retire si groupId=null) un groupe à plusieurs prospects d'un coup. */
@@ -264,5 +274,5 @@ export async function assignGroup(
     where: { id: { in: prospectIds } },
     data: { groupId },
   });
-  revalidatePath("/prospection");
+  bumpProspection();
 }

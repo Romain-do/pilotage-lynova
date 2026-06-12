@@ -1,7 +1,7 @@
 import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { FactDoc, BuyDoc, BuyItemDoc } from "@/lib/facturation";
 import { getTresorerie } from "@/lib/tresorerie-data";
+import { getEvolizInvoices, getEvolizBuys } from "@/lib/facturation-data";
 import { lastSyncAll } from "@/lib/sync-state";
 import { AppNav } from "@/components/AppNav";
 import { Facturation } from "./Facturation";
@@ -14,68 +14,17 @@ export const maxDuration = 60;
 export default async function FacturationPage() {
   await requireDirigeant();
 
-  const [docs, lastSync, buyRows] = await Promise.all([
-    // CA brut (aligné Evoliz) : on ne lit que les factures validées ; les avoirs ne sont
-    // jamais déduits du CA (kind = CREDIT ignoré).
-    prisma.evolizDocument.findMany({
-      where: { kind: "INVOICE", included: true },
-      orderBy: { documentDate: "asc" },
-      select: {
-        kind: true,
-        documentDate: true,
-        totalHt: true,
-        totalTtc: true,
-        paid: true,
-        netToPay: true,
-        clientId: true,
-        clientName: true,
-      },
-    }),
-    // « Dernière synchro » globale (Evoliz + Revolut), cohérente avec le bouton unifié.
+  // Données Evoliz + Revolut mises en cache (loaders globaux, invalidés à la synchro).
+  // « Dernière synchro » non cachée (lastSyncAll) → reflète toujours l'état réel.
+  const [factDocs, buysData, treso, lastSync] = await Promise.all([
+    getEvolizInvoices(),
+    getEvolizBuys(),
+    getTresorerie(),
     lastSyncAll(prisma),
-    // Achats fournisseurs (marge commerciale), avec lignes ventilées par catégorie.
-    prisma.evolizBuy.findMany({
-      where: { included: true },
-      select: {
-        documentDate: true,
-        totalHt: true,
-        supplierId: true,
-        supplierName: true,
-        items: { select: { categoryCode: true, categoryLabel: true, ht: true } },
-      },
-    }),
   ]);
 
-  // Décaissements Revolut (charges nettes hors Evoliz : rémunération, loyer, électricité).
-  // Lecture seule du cache Revolut, comme la vue Trésorerie.
-  const treso = await getTresorerie();
-
-  const buys: BuyDoc[] = buyRows.map((b) => ({
-    date: b.documentDate.toISOString().slice(0, 10),
-    ht: Number(b.totalHt),
-    supplierId: b.supplierId,
-  }));
-  const buyItems: BuyItemDoc[] = buyRows.flatMap((b) =>
-    b.items.map((it) => ({
-      date: b.documentDate.toISOString().slice(0, 10),
-      supplierId: b.supplierId,
-      supplierName: b.supplierName,
-      categoryCode: it.categoryCode,
-      categoryLabel: it.categoryLabel,
-      ht: Number(it.ht),
-    }))
-  );
-
-  const factDocs: FactDoc[] = docs.map((d) => ({
-    kind: d.kind,
-    date: d.documentDate.toISOString().slice(0, 10),
-    ht: Number(d.totalHt),
-    ttc: Number(d.totalTtc),
-    paid: Number(d.paid),
-    netToPay: Number(d.netToPay),
-    clientId: d.clientId,
-    clientName: d.clientName,
-  }));
+  const buys = buysData.buys;
+  const buyItems = buysData.items;
 
   const todayISO = new Date().toISOString().slice(0, 10);
 

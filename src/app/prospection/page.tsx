@@ -1,8 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { mapProspect } from "@/lib/prospection-map";
-import type { StageDTO, GroupDTO } from "@/lib/prospection";
 import { lastSyncAll } from "@/lib/sync-state";
+import { getProspectionBoard } from "@/lib/prospection-data";
 import { AppNav } from "@/components/AppNav";
 import { Prospection } from "./Prospection";
 import { createStarterPipeline } from "./actions";
@@ -20,48 +19,22 @@ export default async function ProspectionPage({
   const me = await requireUser();
   const { prospect } = await searchParams;
 
-  const [pipeline, groups, lastSync] = await Promise.all([
-    prisma.pipeline.findFirst({
-      where: { archived: false },
-      orderBy: { createdAt: "asc" },
-      include: {
-        stages: {
-          orderBy: { position: "asc" },
-          include: {
-            prospects: {
-              where: { archived: false },
-              orderBy: { position: "asc" },
-              include: { comments: true },
-            },
-          },
-        },
-      },
-    }),
-    prisma.group.findMany({ orderBy: { name: "asc" } }),
-    lastSyncAll(prisma),
-  ]);
-
-  const groupDTOs: GroupDTO[] = groups.map((g) => ({ id: g.id, name: g.name, color: g.color }));
+  const [board, lastSync] = await Promise.all([getProspectionBoard(), lastSyncAll(prisma)]);
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
       <AppNav role={me.role} />
 
-      {!pipeline ? (
+      {!board.pipeline ? (
         <EmptyState />
       ) : (
         <Prospection
-          pipelineName={pipeline.name}
+          pipelineName={board.pipeline.name}
           currentUser={{ id: me.id, name: me.name, role: me.role }}
           initialSelectedId={prospect ?? null}
           lastSync={lastSync}
-          initialGroups={groupDTOs}
-          initialStages={pipeline.stages.map<StageDTO>((s) => ({
-            id: s.id,
-            name: s.name,
-            kind: s.kind,
-            prospects: s.prospects.map(mapProspect),
-          }))}
+          initialGroups={board.groups}
+          initialStages={board.pipeline.stages}
         />
       )}
     </main>

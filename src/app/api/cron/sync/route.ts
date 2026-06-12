@@ -49,9 +49,11 @@ export async function GET(request: Request) {
     return { transactions: s.txCount, totalEur: Math.round(s.totalEur), internalLegs: s.internalLegs, exchanges: s.exchangeTx };
   });
 
-  // Invalide le cache de trésorerie (getTresorerie) dès que Revolut est resynchronisé.
+  // Invalide les caches dès que la source correspondante est resynchronisée.
   // Sans ça, les données cachées resteraient figées après la synchro horaire.
-  // Next 16 : 2e arg requis ("max" = recommandé ; pour unstable_cache = invalidation du tag).
+  // Next 16 : 2e arg requis ("max" = SWR recommandé ; pour unstable_cache = invalidation du tag).
+  if (evoliz.ok) revalidateTag("evoliz-invoices", "max");
+  if (evolizBuys.ok) revalidateTag("evoliz-buys", "max");
   if (revolut.ok) revalidateTag("revolut", "max");
 
   const sources = { evoliz, evolizBuys, revolut };

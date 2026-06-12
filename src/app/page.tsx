@@ -14,10 +14,10 @@ import {
   rel,
   euro,
   caHtByFiscalMonth,
-  type FactDoc,
-  type BuyDoc,
 } from "@/lib/facturation";
 import { getTresorerie } from "@/lib/tresorerie-data";
+import { getEvolizInvoices, getEvolizBuys } from "@/lib/facturation-data";
+import { getCockpitProspection } from "@/lib/prospection-data";
 import { lastSyncAll } from "@/lib/sync-state";
 import {
   flowsInRange,
@@ -58,31 +58,15 @@ const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
 async function buildCockpitData(): Promise<CockpitData> {
   const todayISO = new Date().toISOString().slice(0, 10);
 
-  const [docRows, buyRows, treso, pipeline, lastSync] = await Promise.all([
-    prisma.evolizDocument.findMany({
-      where: { kind: "INVOICE", included: true },
-      select: { kind: true, documentDate: true, totalHt: true, totalTtc: true, paid: true, netToPay: true, clientId: true, clientName: true },
-    }),
-    prisma.evolizBuy.findMany({ where: { included: true }, select: { documentDate: true, totalHt: true, supplierId: true } }),
+  const [docs, buysData, treso, rows, lastSync] = await Promise.all([
+    getEvolizInvoices(),
+    getEvolizBuys(),
     getTresorerie(),
-    prisma.pipeline.findFirst({
-      where: { archived: false },
-      orderBy: { createdAt: "asc" },
-      include: {
-        stages: {
-          orderBy: { position: "asc" },
-          include: { prospects: { where: { archived: false }, select: { id: true, company: true, genre: true, nom: true, prenom: true, reminderAt: true, reminderDone: true } } },
-        },
-      },
-    }),
+    getCockpitProspection(),
     lastSyncAll(prisma),
   ]);
 
-  const docs: FactDoc[] = docRows.map((d) => ({
-    kind: d.kind, date: d.documentDate.toISOString().slice(0, 10), ht: Number(d.totalHt), ttc: Number(d.totalTtc),
-    paid: Number(d.paid), netToPay: Number(d.netToPay), clientId: d.clientId, clientName: d.clientName,
-  }));
-  const buys: BuyDoc[] = buyRows.map((b) => ({ date: b.documentDate.toISOString().slice(0, 10), ht: Number(b.totalHt), supplierId: b.supplierId }));
+  const buys = buysData.buys;
 
   // ── Finances : exercice en cours vs N-1 (définitions identiques à Facturation) ──
   const fy = fyOf(todayISO);
@@ -118,10 +102,7 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   const monthLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
-  // ── Prospection (définitions identiques à la liste) ──
-  const rows = (pipeline?.stages ?? []).flatMap((s) =>
-    s.prospects.map((pr) => ({ id: pr.id, company: pr.company, genre: pr.genre, nom: pr.nom, prenom: pr.prenom, reminderAt: pr.reminderAt, reminderDone: pr.reminderDone, kind: s.kind }))
-  );
+  // ── Prospection (définitions identiques à la liste) — `rows` = getCockpitProspection() ──
   const counts: Record<KpiCategory, number> = { a_rencontrer: 0, rencontres: 0, a_installer: 0, installes: 0, refus: 0 };
   for (const r of rows) {
     const c = categoryOf(r.kind);
@@ -137,9 +118,9 @@ async function buildCockpitData(): Promise<CockpitData> {
       if (!r.reminderAt || r.reminderDone) return false;
       const c = categoryOf(r.kind);
       if (!c || HIDDEN_CATS.has(c)) return false;
-      return reminderStatus(r.reminderAt.toISOString(), r.reminderDone, now) === "overdue";
+      return reminderStatus(r.reminderAt, r.reminderDone, now) === "overdue";
     })
-    .sort((a, b) => a.reminderAt!.getTime() - b.reminderAt!.getTime());
+    .sort((a, b) => Date.parse(a.reminderAt!) - Date.parse(b.reminderAt!));
 
   const recontacter = overdue.slice(0, 6).map((r) => ({
     id: r.id,
@@ -147,7 +128,7 @@ async function buildCockpitData(): Promise<CockpitData> {
     genre: r.genre,
     nom: r.nom,
     prenom: r.prenom,
-    dateLabel: formatDateFR(r.reminderAt!.toISOString()) ?? "",
+    dateLabel: formatDateFR(r.reminderAt!) ?? "",
   }));
 
   // ── Actions prioritaires (déduites des données) ──
