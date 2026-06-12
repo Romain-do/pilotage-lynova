@@ -129,26 +129,106 @@ export function categoriesInRange(outflows: OutflowRow[], range: DateRange): TCa
   return [...map.entries()].map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
 }
 
-/** Charges « nettes » captées via Revolut (HT = TTC) servant à la marge nette approchée :
- *  Rémunération + Loyer + Électricité, HORS Evoliz (pas de double comptage). L'assurance est
- *  exclue (fournisseur Mapa déjà présent dans les achats Evoliz). Suit la même plage. */
-export interface NetCharges {
-  remuneration: number;
-  loyer: number;
-  electricite: number;
-  total: number;
+// ── Marge nette base DÉPENSES Revolut ──
+// Principe : tout le flux professionnel passe par Revolut. Les charges = TOUS les décaissements
+// EXTERNES (les outflows sont déjà filtrés : hors virements internes, hors exchange/crypto, hors
+// Coinbase — cf. buildTresorerie) SAUF une deny-list de NON-charges. Aucun achat Evoliz n'entre
+// ici : la marge nette = CA HT − charges Revolut. La marge COMMERCIALE (CA − achats Evoliz) reste
+// un indicateur séparé et inchangé. Pas de double comptage (chaque dépense comptée une seule fois).
+
+/** Catégories `categorize()` exclues des charges (non-charges, pass-through / hors résultat) :
+ *  - TVA : collectée puis reversée (CA déjà en HT).
+ *  - Impôt sociétés (IS) : marge nette = AVANT impôt sur les bénéfices.
+ *  (Virements internes & crypto : déjà exclus en amont des outflows.) */
+export const DENY_CATEGORIES: readonly string[] = ["TVA", "Impôt sociétés (IS)"];
+
+/** Catégories de charges affichées/empilées, dans l'ordre des segments du graphe.
+ *  « Autres » = décaissement avec libellé mais hors règles (dépense opérationnelle réelle). */
+export const CHARGE_CATEGORIES = [
+  "Rémunération",
+  "Loyer",
+  "Électricité",
+  "Charges sociales",
+  "Assurance",
+  "Comptable",
+  "Abonnements & télécom",
+  "Fournisseurs",
+  "Notes de frais",
+  "Autres",
+] as const;
+export type ChargeCategory = (typeof CHARGE_CATEGORIES)[number];
+
+/** Catégorie de charge d'un décaissement, ou null s'il s'agit d'une non-charge (deny-list).
+ *  « (sans libellé) » (résiduel, ≈ 0 €) est replié sur « Autres ». */
+function chargeCategoryOf(reference: string | null | undefined, counterparty?: string | null): ChargeCategory | null {
+  const c = categorize(reference, counterparty);
+  if (DENY_CATEGORIES.includes(c)) return null;
+  if (c === "(sans libellé)") return "Autres";
+  return c as ChargeCategory;
 }
-export function netChargesInRange(outflows: OutflowRow[], range: DateRange): NetCharges {
-  let remuneration = 0, loyer = 0, electricite = 0;
+
+function emptyByCategory(): Record<ChargeCategory, number> {
+  return Object.fromEntries(CHARGE_CATEGORIES.map((c) => [c, 0])) as Record<ChargeCategory, number>;
+}
+
+/** Charges Revolut sur la plage : total + ventilation par catégorie (hors deny-list).
+ *  Base de la marge nette = CA HT − total. */
+export interface RevolutCharges {
+  total: number;
+  byCategory: Record<ChargeCategory, number>;
+}
+export function netChargesInRange(outflows: OutflowRow[], range: DateRange): RevolutCharges {
+  const byCategory = emptyByCategory();
+  let total = 0;
   for (const o of outflows) {
     if (!dateInRange(o.date, range)) continue;
-    switch (categorize(o.reference, o.counterparty)) {
-      case "Rémunération": remuneration += o.amount; break;
-      case "Loyer": loyer += o.amount; break;
-      case "Électricité": electricite += o.amount; break;
-    }
+    const cc = chargeCategoryOf(o.reference, o.counterparty);
+    if (cc == null) continue; // non-charge (TVA / IS)
+    byCategory[cc] += o.amount;
+    total += o.amount;
   }
-  return { remuneration, loyer, electricite, total: remuneration + loyer + electricite };
+  return { total, byCategory };
+}
+
+// ── Séries mensuelles (oct→sept) & par mois civil pour les graphes ──
+
+/** Rémunération (décaissements Revolut « Rémunération ») ventilée sur les 12 mois fiscaux
+ *  [oct → sept] d'un exercice `fy`. Indices oct=0 … sept=11. Mois sans décaissement = 0.
+ *  Symétrique de `caHtByFiscalMonth` côté Facturation. */
+export function remuByFiscalMonth(outflows: OutflowRow[], fy: number): number[] {
+  const out = new Array(12).fill(0);
+  const start = `${fy - 1}-10-01`;
+  const end = `${fy}-09-30`;
+  for (const o of outflows) {
+    if (o.date < start || o.date > end) continue;
+    if (categorize(o.reference, o.counterparty) !== "Rémunération") continue;
+    const m = Number(o.date.slice(5, 7));
+    out[m >= 10 ? m - 10 : m + 2] += o.amount;
+  }
+  return out;
+}
+
+/** Charges Revolut (hors deny-list) ventilées par catégorie ET par mois CIVIL, alignées sur
+ *  `months` (mêmes clés YYYY-MM que `computeRange`). Sert la barre empilée « CA vs charges ».
+ *  Chaque catégorie → un tableau de longueur `months`. Mois hors `months` ignorés ; mois sans
+ *  décaissement (avant les données bancaires) → 0. La somme de toutes les catégories sur la plage
+ *  égale `netChargesInRange(range).total` (mêmes outflows, même deny-list). */
+export function chargeComponentsByMonth(
+  outflows: OutflowRow[],
+  months: { key: string }[]
+): Record<ChargeCategory, number[]> {
+  const idx = new Map(months.map((m, i) => [m.key, i]));
+  const out = Object.fromEntries(
+    CHARGE_CATEGORIES.map((c) => [c, new Array(months.length).fill(0)])
+  ) as Record<ChargeCategory, number[]>;
+  for (const o of outflows) {
+    const i = idx.get(o.date.slice(0, 7));
+    if (i == null) continue;
+    const cc = chargeCategoryOf(o.reference, o.counterparty);
+    if (cc == null) continue; // non-charge (TVA / IS)
+    out[cc][i] += o.amount;
+  }
+  return out;
 }
 
 /** Date du plus ancien décaissement capté (début des données bancaires). */

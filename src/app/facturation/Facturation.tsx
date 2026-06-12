@@ -40,9 +40,10 @@ import {
   type PresetKey,
   type CatRow,
 } from "@/lib/facturation";
-import { netChargesInRange, earliestOutflowDate, type OutflowRow } from "@/lib/tresorerie";
+import { netChargesInRange, chargeComponentsByMonth, remuByFiscalMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
 import { KpiCard } from "@/components/KpiCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
+import { CaVsChargesChart, ChargesLegend, CHARGE_META } from "@/components/CaVsChargesChart";
 import { RefreshButton } from "@/components/RefreshButton";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
@@ -92,16 +93,21 @@ export function Facturation({
   const mrr = useMemo(() => computeMRR(docs, range), [docs, range]);
   const clients = useMemo(() => computeClients(docs, range), [docs, range]);
   const cats = useMemo(() => computeBuyCategories(buyItems, range), [buyItems, range]);
+  // Charges Revolut ventilées par catégorie & par mois civil (alignées sur cur.months) pour la
+  // barre empilée « CA vs charges ». CA − charges = marge nette du mois (mêmes charges, même
+  // deny-list que netChargesInRange).
+  const chargeComps = useMemo(() => chargeComponentsByMonth(outflows, cur.months), [outflows, cur.months]);
 
-  // ── Marge nette approchée (CA − achats Evoliz − charges Revolut hors Evoliz) ──
+  // ── Marge nette = CA HT − charges Revolut (tous décaissements externes hors deny-list TVA/IS) ──
+  // La marge COMMERCIALE (cur.marge = CA − achats Evoliz) reste séparée et inchangée.
   const bankStart = useMemo(() => earliestOutflowDate(outflows), [outflows]);
   const netCur = useMemo(() => netChargesInRange(outflows, range), [outflows, range]);
   const netPrev = useMemo(() => netChargesInRange(outflows, shiftYear(range)), [outflows, range]);
   // Données bancaires dispo si la plage atteint au moins le début du cache Revolut.
   const hasBank = bankStart != null && range.end >= bankStart;
   const hasBankPrev = bankStart != null && shiftYear(range).end >= bankStart;
-  const margeNette = cur.marge - netCur.total;
-  const margeNettePrev = prev.marge - netPrev.total;
+  const margeNette = cur.caHtTotal - netCur.total;
+  const margeNettePrev = prev.caHtTotal - netPrev.total;
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
   const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
   const tauxNetteDeltaPts =
@@ -117,6 +123,9 @@ export function Facturation({
   const fyNow = fyOf(todayISO);
   const caFyCur = useMemo(() => caHtByFiscalMonth(docs, fyNow), [docs, fyNow]);
   const caFyPrev = useMemo(() => caHtByFiscalMonth(docs, fyNow - 1), [docs, fyNow]);
+  // Rémunération (décaissements Revolut « Rémunération ») par mois fiscal — exercice vs N-1.
+  const remuFyCur = useMemo(() => remuByFiscalMonth(outflows, fyNow), [outflows, fyNow]);
+  const remuFyPrev = useMemo(() => remuByFiscalMonth(outflows, fyNow - 1), [outflows, fyNow]);
 
   const sortedClients = useMemo(
     () => [...clients].sort((a, b) => (clientSort === "ca" ? b.ca - a.ca : b.aboHt - a.aboHt)).slice(0, 12),
@@ -152,7 +161,6 @@ export function Facturation({
           value={margeNette}
           delta={hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null}
           caHtTotal={cur.caHtTotal}
-          achatsHt={cur.achatsHt}
           net={netCur}
         />
         <KpiCard
@@ -178,19 +186,19 @@ export function Facturation({
       {/* ───────── Graphiques ───────── */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="rounded-card border border-line bg-white p-4 shadow-card lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">CA vs Achats — mensuel HT</h2>
-            <div className="flex items-center gap-3 text-xs text-ink-2">
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Abonnement</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan/40" /> Installation</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Achats</span>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
+            <ChargesLegend />
           </div>
-          <MonthlyChart
-            months={cur.months}
-            abo={cur.aboByMonth}
-            install={cur.installByMonth}
-            achats={cur.achatsByMonth}
+          <p className="mt-0.5 text-xs text-ink-3">CA − charges = marge nette du mois · charges = dépenses Revolut (hors TVA/IS)</p>
+          <CaVsChargesChart
+            data={{
+              months: cur.months,
+              abo: cur.aboByMonth,
+              install: cur.installByMonth,
+              charges: chargeComps,
+            }}
+            bankStart={bankStart}
           />
         </div>
 
@@ -207,6 +215,19 @@ export function Facturation({
           </div>
         </div>
         <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
+      </div>
+
+      {/* ───────── Évolution rémunération — exercice vs N-1 ───────── */}
+      <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">Évolution rémunération — exercice {fyNow} vs {fyNow - 1}</h2>
+          <div className="flex items-center gap-3 text-xs text-ink-2">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
+          </div>
+        </div>
+        <p className="mt-0.5 text-xs text-ink-3">Décaissements Revolut « Rémunération » · captés depuis nov. 2024</p>
+        <CaVsN1Chart current={remuFyCur} previous={remuFyPrev} fy={fyNow} unitLabel="Rémunération" />
       </div>
 
       {/* ───────── Clients + Catégories ───────── */}
@@ -238,8 +259,9 @@ export function Facturation({
 
       <p className="mt-4 text-xs text-ink-3">
         CA en <strong className="text-ink-2">HT brut</strong> (factures validées, avoirs non déduits) ·
-        marge <strong className="text-ink-2">commerciale</strong> = CA − achats fournisseurs (hors
-        rémunération, charges sociales, impôts, amortissements) · « encaissé / restant dû » en{" "}
+        marge <strong className="text-ink-2">commerciale</strong> = CA − achats fournisseurs Evoliz ·
+        marge <strong className="text-ink-2">nette</strong> = CA HT − toutes les dépenses Revolut
+        (décaissements externes hors TVA &amp; impôt sociétés) · « encaissé / restant dû » en{" "}
         <strong className="text-ink-2">TTC</strong>.
       </p>
 
@@ -336,14 +358,14 @@ function Toolbar({
 
 /* ───────────────────────── KPI & stats ───────────────────────── */
 
-// Carte « Marge nette (approchée) » = CA HT − achats Evoliz − (rémunération + loyer + électricité
-// captés via Revolut). Grise et explicite si la plage précède les données bancaires (nov. 2024).
+// Carte « Marge nette » = CA HT − charges Revolut (tous décaissements externes hors deny-list
+// TVA/IS). Grise et explicite si la plage précède les données bancaires (nov. 2024).
 function MargeNetteCard({
-  hasBank, value, delta, caHtTotal, achatsHt, net,
+  hasBank, value, delta, caHtTotal, net,
 }: {
   hasBank: boolean; value: number; delta: number | null;
-  caHtTotal: number; achatsHt: number;
-  net: { remuneration: number; loyer: number; electricite: number; total: number };
+  caHtTotal: number;
+  net: RevolutCharges;
 }) {
   return (
     <div className="group relative rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
@@ -369,16 +391,16 @@ function MargeNetteCard({
               </span>
             )}
           </div>
-          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">charges nettes captées depuis nov. 2024</p>
-          {/* Détail au survol */}
-          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden w-60 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block">
-            <div className="font-semibold text-ink">Marge nette approchée</div>
+          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">CA HT − dépenses Revolut (hors TVA/IS) · depuis nov. 2024</p>
+          {/* Détail au survol : ventilation des charges Revolut par catégorie */}
+          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden max-h-80 w-64 -translate-x-1/2 overflow-auto rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block">
+            <div className="font-semibold text-ink">Marge nette = CA HT − charges Revolut</div>
             <div className="mt-2 space-y-1">
               <TipRow label="CA HT" value={euro(caHtTotal)} />
-              <TipRow label="− Achats Evoliz" value={euro(-achatsHt)} />
-              <TipRow label="− Rémunération" value={euro(-net.remuneration)} />
-              <TipRow label="− Loyer" value={euro(-net.loyer)} />
-              <TipRow label="− Électricité" value={euro(-net.electricite)} />
+              <div className="my-1 border-t border-line" />
+              {CHARGE_META.filter((m) => net.byCategory[m.key] > 0).map((m) => (
+                <TipRow key={m.key} label={`− ${m.label}`} value={euro(-net.byCategory[m.key])} />
+              ))}
               <div className="mt-1 border-t border-line pt-1"><TipRow label="= Marge nette" value={euro(value)} strong /></div>
             </div>
           </div>
@@ -389,90 +411,6 @@ function MargeNetteCard({
           <p className="mt-1.5 min-h-4 text-xs leading-tight text-ink-3">pas de données bancaires avant nov. 2024</p>
         </>
       )}
-    </div>
-  );
-}
-
-/* ───────────────────────── Graphe mensuel ───────────────────────── */
-
-function MonthlyChart({ months, abo, install, achats }: { months: { key: string; label: string }[]; abo: number[]; install: number[]; achats: number[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const ca = months.map((_, i) => abo[i] + install[i]);
-  const max = Math.max(1, ...ca, ...achats);
-  const n = months.length;
-  const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
-  const ariaLabel = `CA vs achats mensuels HT sur ${n} mois : CA total ${euro(sum(ca))} (abonnement ${euro(sum(abo))}, installation ${euro(sum(install))}), achats total ${euro(sum(achats))}.`;
-  return (
-    <div className="relative mt-3" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
-      <div className="flex h-48 items-end gap-1 sm:gap-1.5">
-        {months.map((m, i) => {
-          const active = hover === null || hover === i;
-          return (
-            <div key={m.key} className="relative flex h-full flex-1 cursor-default flex-col items-center justify-end rounded-md" onMouseEnter={() => setHover(i)}>
-              <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${hover === i ? "bg-cyan/[0.07]" : ""}`} />
-              <div className="relative flex h-full w-full items-end justify-center gap-1 pb-5">
-                <StackedBar abo={abo[i]} install={install[i]} max={max} idx={i} dim={!active} />
-                <SimpleBar value={achats[i]} max={max} idx={i} color="bg-amber-400" dim={!active} />
-              </div>
-              {(n <= 14 || i % 2 === 0) && (
-                <span className={`absolute bottom-0 truncate text-[9px] transition-colors ${hover === i ? "font-semibold text-ink" : "text-ink-3"}`}>{m.label}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {hover !== null && (
-        <MargeTooltip index={hover} n={n} label={months[hover].label} abo={abo[hover]} install={install[hover]} achats={achats[hover]} />
-      )}
-    </div>
-  );
-}
-
-// Barre CA empilée : abonnement (bas, cyan plein) + installation (haut, cyan clair).
-function StackedBar({ abo, install, max, idx, dim }: { abo: number; install: number; max: number; idx: number; dim: boolean }) {
-  const total = abo + install;
-  const h = Math.min(100, (total / max) * 100);
-  const aboFrac = total > 0 ? (abo / total) * 100 : 0;
-  const installFrac = total > 0 ? (install / total) * 100 : 0;
-  return (
-    <div
-      className={`flex w-4 origin-bottom flex-col justify-end overflow-hidden rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${dim ? "opacity-40" : "opacity-100"}`}
-      style={{ height: `${h}%`, animationDelay: `${idx * 20}ms` }}
-    >
-      {install > 0 && <div className="w-full bg-cyan/40" style={{ height: `${installFrac}%` }} />}
-      {abo > 0 && <div className="w-full bg-cyan" style={{ height: `${aboFrac}%` }} />}
-    </div>
-  );
-}
-
-function SimpleBar({ value, max, idx, color, dim }: { value: number; max: number; idx: number; color: string; dim: boolean }) {
-  const h = Math.min(100, (value / max) * 100);
-  return (
-    <div
-      className={`w-4 origin-bottom rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${color} ${dim ? "opacity-40" : "opacity-100"}`}
-      style={{ height: `${h}%`, animationDelay: `${idx * 20}ms` }}
-    />
-  );
-}
-
-function MargeTooltip({ index, n, label, abo, install, achats }: { index: number; n: number; label: string; abo: number; install: number; achats: number }) {
-  const ca = abo + install;
-  const marge = ca - achats;
-  const taux = ca > 0 ? (marge / ca) * 100 : null;
-  const left = ((index + 0.5) / n) * 100;
-  const alignRight = index > n * 0.66;
-  return (
-    <div className="pointer-events-none absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover"
-      style={{ left: `${left}%`, ...(alignRight ? { transform: "translateX(-85%)" } : {}) }}>
-      <div className="font-semibold text-ink">{label}</div>
-      <div className="mt-2 space-y-1">
-        <TipRow label="Abonnement" value={euro(abo)} />
-        <TipRow label="Installation" value={euro(install)} />
-        <TipRow label="CA HT" value={euro(ca)} strong />
-        <TipRow label="Achats HT" value={euro(achats)} />
-        <TipRow label="Marge" value={euro(marge)} strong />
-      </div>
-      <div className="mt-2 border-t border-line pt-1.5 text-ink-3">{taux !== null ? `Taux ${taux.toFixed(0)} %` : "—"}</div>
     </div>
   );
 }
