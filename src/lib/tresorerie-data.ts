@@ -2,6 +2,8 @@
 // Calcule : comptes, P&L crypto global, séries mensuelles (flux externes EUR +
 // solde EUR fin de mois), et décaissements externes (pour catégorisation).
 import type { PrismaClient } from "@prisma/client";
+import { unstable_cache } from "next/cache";
+import { prisma } from "@/lib/prisma";
 import type { TAccount, MonthRow, OutflowRow, CryptoPnl } from "@/lib/tresorerie";
 
 const FIAT = new Set(["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK", "PLN"]);
@@ -169,3 +171,20 @@ export async function buildTresorerie(prisma: PrismaClient): Promise<TresorerieD
     lastSync: sync?.lastSyncAt ? sync.lastSyncAt.toISOString() : null,
   };
 }
+
+/**
+ * Version MISE EN CACHE de `buildTresorerie` (cache inter-requêtes Next, données globales
+ * d'entreprise — aucune dépendance à l'utilisateur). Évite de recharger toutes les
+ * transactions Revolut + recalculer à chaque navigation (/, /facturation, /tresorerie).
+ *
+ * - Sans argument (clé de cache stable) → utilise le singleton `prisma` en interne.
+ * - Invalidée par `revalidateTag("revolut")` : cron /api/cron/sync + bouton « Actualiser ».
+ * - Filet `revalidate: 3600` (1 h) : rafraîchissement horaire même si un tag est manqué
+ *   (couvre aussi les bornes de mois dépendantes de la date).
+ * Les pages restent `force-dynamic` : seul ce loader est caché, l'auth reste par-requête.
+ */
+export const getTresorerie = unstable_cache(
+  async (): Promise<TresorerieData> => buildTresorerie(prisma),
+  ["tresorerie-data"],
+  { tags: ["revolut"], revalidate: 3600 }
+);

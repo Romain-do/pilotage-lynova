@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireDirigeant } from "@/lib/auth";
 import { syncEvoliz, syncEvolizBuys } from "@/lib/evoliz/sync";
@@ -31,7 +31,12 @@ export async function refreshAll(): Promise<{ ok: boolean; message: string; last
     runSafe("syncRevolut", () => syncRevolut(prisma)),
   ]);
 
-  // Toutes les vues qui consomment ces caches.
+  // Invalide le cache de trésorerie (getTresorerie) si Revolut a bien resynchronisé.
+  // updateTag = read-your-own-writes (server action) : la donnée fraîche s'affiche dès le
+  // 1er rendu après « Actualiser » (pas de stale). Interop avec unstable_cache vérifiée.
+  if (rev) updateTag("revolut");
+
+  // Toutes les vues qui consomment ces caches (filet : purge aussi le cache de route).
   for (const path of ["/", "/facturation", "/tresorerie", "/prospection"]) revalidatePath(path);
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);

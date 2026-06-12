@@ -17,7 +17,7 @@ import {
   type FactDoc,
   type BuyDoc,
 } from "@/lib/facturation";
-import { buildTresorerie } from "@/lib/tresorerie-data";
+import { getTresorerie } from "@/lib/tresorerie-data";
 import { lastSyncAll } from "@/lib/sync-state";
 import {
   flowsInRange,
@@ -64,7 +64,7 @@ async function buildCockpitData(): Promise<CockpitData> {
       select: { kind: true, documentDate: true, totalHt: true, totalTtc: true, paid: true, netToPay: true, clientId: true, clientName: true },
     }),
     prisma.evolizBuy.findMany({ where: { included: true }, select: { documentDate: true, totalHt: true, supplierId: true } }),
-    buildTresorerie(prisma),
+    getTresorerie(),
     prisma.pipeline.findFirst({
       where: { archived: false },
       orderBy: { createdAt: "asc" },

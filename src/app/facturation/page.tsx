@@ -1,7 +1,7 @@
 import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { FactDoc, BuyDoc, BuyItemDoc } from "@/lib/facturation";
-import { buildTresorerie } from "@/lib/tresorerie-data";
+import { getTresorerie } from "@/lib/tresorerie-data";
 import { lastSyncAll } from "@/lib/sync-state";
 import { AppNav } from "@/components/AppNav";
 import { Facturation } from "./Facturation";
@@ -48,7 +48,7 @@ export default async function FacturationPage() {
 
   // Décaissements Revolut (charges nettes hors Evoliz : rémunération, loyer, électricité).
   // Lecture seule du cache Revolut, comme la vue Trésorerie.
-  const treso = await buildTresorerie(prisma);
+  const treso = await getTresorerie();
 
   const buys: BuyDoc[] = buyRows.map((b) => ({
     date: b.documentDate.toISOString().slice(0, 10),

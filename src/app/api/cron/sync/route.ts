@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncEvoliz, syncEvolizBuys } from "@/lib/evoliz/sync";
 import { syncRevolut } from "@/lib/revolut/sync";
@@ -47,6 +48,11 @@ export async function GET(request: Request) {
     const s = await syncRevolut(prisma);
     return { transactions: s.txCount, totalEur: Math.round(s.totalEur), internalLegs: s.internalLegs, exchanges: s.exchangeTx };
   });
+
+  // Invalide le cache de trésorerie (getTresorerie) dès que Revolut est resynchronisé.
+  // Sans ça, les données cachées resteraient figées après la synchro horaire.
+  // Next 16 : 2e arg requis ("max" = recommandé ; pour unstable_cache = invalidation du tag).
+  if (revolut.ok) revalidateTag("revolut", "max");
 
   const sources = { evoliz, evolizBuys, revolut };
   const ok = Object.values(sources).every((r) => r.ok);
