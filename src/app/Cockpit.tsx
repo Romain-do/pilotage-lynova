@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   IconCoin,
   IconReportMoney,
+  IconPigMoney,
   IconPercentage,
   IconRepeat,
   IconWallet,
@@ -20,6 +21,8 @@ import { AppNav } from "@/components/AppNav";
 import { KpiCard } from "@/components/KpiCard";
 import { LeayaCard } from "@/components/LeayaCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
+import { CaVsChargesChart, ChargesLegend, type ChargeSeries } from "@/components/CaVsChargesChart";
+import { TresoAreaChart, type SeriePoint } from "@/components/TresoAreaChart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
 import { prospectTitle, prospectContactName } from "@/lib/prospection";
@@ -32,9 +35,15 @@ export interface CockpitData {
   leayaPrev: number;
   caFyCur: number[];
   caFyPrev: number[];
+  // Évolution de la trésorerie (solde fin de mois, 12 derniers mois) — réutilise TresoAreaChart.
+  tresoSeries: SeriePoint[];
+  // CA vs charges mensuel HT (exercice en cours) — réutilise CaVsChargesChart.
+  caVsCharges: ChargeSeries;
+  bankStart: string | null;
   finance: {
     caHt: number; caDelta: number | null;
     margeNette: number; margeNetteDelta: number | null; hasBank: boolean;
+    remu: number; remuDelta: number | null;
     tauxNette: number | null; tauxNetteDeltaPts: number | null;
     mrr: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
@@ -125,6 +134,10 @@ export function Cockpit({
               value={f.hasBank ? euro(f.margeNette) : "n/a"} muted={!f.hasBank}
               delta={f.hasBank ? f.margeNetteDelta : null}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
+            <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
+              value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
+              delta={f.hasBank ? f.remuDelta : null}
+              foot={f.hasBank ? "versée sur l'exercice (Revolut)" : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
               value={f.hasBank && f.tauxNette != null ? `${f.tauxNette.toFixed(1)} %` : "n/a"} muted={!f.hasBank}
               delta={f.tauxNetteDeltaPts} deltaUnit="pts"
@@ -139,6 +152,13 @@ export function Cockpit({
           </div>
         </div>
 
+        {/* Évolution de la trésorerie (12 derniers mois) */}
+        <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+          <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
+          <p className="text-xs text-ink-3">Solde EUR fin de mois · exercice {data.fy}</p>
+          <TresoAreaChart series={data.tresoSeries} />
+        </div>
+
         {/* CA HT mensuel — exercice vs N-1 */}
         <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
           <div className="flex items-center justify-between">
@@ -149,6 +169,16 @@ export function Cockpit({
             </div>
           </div>
           <CaVsN1Chart current={data.caFyCur} previous={data.caFyPrev} fy={data.fy} />
+        </div>
+
+        {/* CA vs charges — mensuel HT (exercice en cours) */}
+        <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
+            <ChargesLegend />
+          </div>
+          <p className="mt-0.5 text-xs text-ink-3">CA − charges = marge nette du mois · exercice {data.fy}</p>
+          <CaVsChargesChart data={data.caVsCharges} bankStart={data.bankStart} />
         </div>
 
         {/* Bloc Prospection */}

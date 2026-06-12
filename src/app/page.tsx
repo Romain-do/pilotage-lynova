@@ -22,6 +22,8 @@ import { lastSyncAll } from "@/lib/sync-state";
 import {
   flowsInRange,
   netChargesInRange,
+  chargeComponentsByMonth,
+  seriesForRange,
   earliestOutflowDate,
   leayaInRange,
 } from "@/lib/tresorerie";
@@ -80,8 +82,12 @@ async function buildCockpitData(): Promise<CockpitData> {
   const hasBankPrev = bankStart != null && prevRange.end >= bankStart;
   const net = netChargesInRange(treso.outflows, range);
   const netPrev = netChargesInRange(treso.outflows, prevRange);
-  const margeNette = cur.marge - net.total;
-  const margeNettePrev = prev.marge - netPrev.total;
+  // Marge nette = CA HT − charges Revolut (hors deny-list TVA/IS). Marge commerciale (cur.marge) séparée.
+  const margeNette = cur.caHtTotal - net.total;
+  const margeNettePrev = prev.caHtTotal - netPrev.total;
+  // Rémunération versée (catégorie Revolut « Rémunération ») sur l'exercice à date, vs N-1 même fenêtre.
+  const remu = net.byCategory["Rémunération"];
+  const remuPrev = netPrev.byCategory["Rémunération"];
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
   const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
   const mrr = computeMRR(docs, range);
@@ -90,6 +96,18 @@ async function buildCockpitData(): Promise<CockpitData> {
   // CA HT mensuel exercice vs N-1 (axe fiscal oct→sept).
   const caFyCur = caHtByFiscalMonth(docs, fy);
   const caFyPrev = caHtByFiscalMonth(docs, fy - 1);
+
+  // Évolution de la trésorerie : solde fin de mois sur l'exercice en cours (même période que les
+  // autres graphes du Cockpit).
+  const tresoSeries = seriesForRange(treso.months, range);
+  // CA vs charges — mensuel HT (exercice en cours). Mêmes charges que la marge nette ⇒ cohérence.
+  const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months);
+  const caVsCharges = {
+    months: cur.months,
+    abo: cur.aboByMonth,
+    install: cur.installByMonth,
+    charges: chargeComps,
+  };
 
   // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
   const fiatEur = treso.accounts.filter((a) => a.kind === "FIAT").reduce((s, a) => s + (a.valoEur ?? 0), 0);
@@ -148,11 +166,16 @@ async function buildCockpitData(): Promise<CockpitData> {
     leayaPrev,
     caFyCur,
     caFyPrev,
+    tresoSeries,
+    caVsCharges,
+    bankStart,
     finance: {
       caHt: cur.caHtTotal,
       caDelta: rel(cur.caHtTotal, prev.caHtTotal),
       margeNette,
       margeNetteDelta: hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null,
+      remu,
+      remuDelta: hasBank && hasBankPrev ? rel(remu, remuPrev) : null,
       hasBank,
       tauxNette,
       tauxNetteDeltaPts: hasBank && hasBankPrev && tauxNette != null && tauxNettePrev != null ? tauxNette - tauxNettePrev : null,
