@@ -8,6 +8,7 @@ import { syncRevolut } from "@/lib/revolut/sync";
 // `Authorization: Bearer <CRON_SECRET>` automatiquement).
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // s — Vercel Pro autorise jusqu'à 300 s
+export const preferredRegion = "dub1"; // au plus près de la DB Supabase (eu-west-1)
 
 type SourceResult = { ok: boolean; counters?: Record<string, number>; error?: string };
 

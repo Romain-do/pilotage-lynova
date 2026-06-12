@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 // Déconnexion : invalide la session Supabase puis renvoie vers /login.
+export const preferredRegion = "dub1"; // proximité Supabase (auth)
+
 export async function POST(request: NextRequest) {
   if (isSupabaseConfigured()) {
     const supabase = await createClient();

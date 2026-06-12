@@ -7,6 +7,7 @@ import { buildAuthorizeUrl } from "@/lib/msgraph/auth";
 // Démarre la connexion OAuth Microsoft 365 — DIRIGEANT uniquement (garde côté serveur, §3).
 // Génère un `state` anti-CSRF déposé en cookie httpOnly, puis redirige vers Azure.
 export const dynamic = "force-dynamic";
+export const preferredRegion = "dub1"; // proximité DB Supabase (getCurrentUser)
 
 export async function GET(request: NextRequest) {
   const { origin } = new URL(request.url);

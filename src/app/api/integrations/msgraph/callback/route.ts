@@ -5,6 +5,7 @@ import { exchangeCodeAndStore } from "@/lib/msgraph/auth";
 // Callback OAuth Microsoft 365. Vérifie le `state` anti-CSRF (cookie), échange le `code`
 // contre les tokens et persiste la connexion. DIRIGEANT uniquement (garde côté serveur).
 export const dynamic = "force-dynamic";
+export const preferredRegion = "dub1"; // proximité DB Supabase (getCurrentUser + upsert)
 
 export async function GET(request: NextRequest) {
   const { origin, searchParams } = new URL(request.url);
