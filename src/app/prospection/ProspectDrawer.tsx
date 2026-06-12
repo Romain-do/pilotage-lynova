@@ -232,13 +232,10 @@ export function ProspectDrawer({
             {savedMsg && <span className="text-sm text-emerald-600">{savedMsg}</span>}
           </div>
 
-          {/* E-mails Outlook — DIRIGEANT seul (les actions serveur re-vérifient le rôle, §3) */}
-          {currentUser.role === "DIRIGEANT" && (
-            <>
-              <PresentationEmail prospect={prospect} />
-              <MeetingForm prospect={prospect} />
-            </>
-          )}
+          {/* E-mails Outlook — accessibles à tout utilisateur authentifié (envoi depuis le
+              compte Microsoft partagé ; les actions serveur re-vérifient l'auth via requireUser). */}
+          <PresentationEmail prospect={prospect} />
+          <MeetingForm prospect={prospect} />
 
           {/* Commentaires */}
           <div className="rounded-xl border border-navy/10 bg-white p-4">

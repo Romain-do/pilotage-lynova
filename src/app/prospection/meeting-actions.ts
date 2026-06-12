@@ -2,15 +2,15 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireDirigeant } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { isMsGraphConnected } from "@/lib/msgraph/auth";
 import { createCalendarEvent, GraphError } from "@/lib/msgraph/graph";
 import { sendMail } from "@/lib/msgraph/mail";
 import { meetingNotificationEmail, MEETING_NOTIFY_TO } from "@/lib/email/templates";
 
-// Server action de création d'un RDV Outlook/Teams (§ RDV prospect). DIRIGEANT seul :
-// l'événement est créé dans le calendrier connecté et les invitations partent depuis ce
-// compte. Joignable en POST direct → re-vérifie l'autorisation côté serveur (§3).
+// Server action de création d'un RDV Outlook/Teams (§ RDV prospect). Tout utilisateur
+// authentifié : l'événement est créé dans le calendrier Microsoft partagé et les invitations
+// partent depuis ce compte. Joignable en POST direct → re-vérifie l'auth côté serveur (requireUser).
 
 export interface MeetingActionState {
   ok: boolean;
@@ -49,7 +49,7 @@ function addMinutes(startDateTime: string, minutes: number): string {
 }
 
 export async function createMeeting(input: MeetingInput): Promise<MeetingActionState> {
-  await requireDirigeant();
+  await requireUser();
 
   const parsed = meetingSchema.safeParse(input);
   if (!parsed.success) {

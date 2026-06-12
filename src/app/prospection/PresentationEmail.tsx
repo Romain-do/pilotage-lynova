@@ -5,8 +5,8 @@ import type { ProspectDTO } from "@/lib/prospection";
 import { presentationEmail, PRESENTATION_CC } from "@/lib/email/templates";
 import { sendPresentationEmail, type MailActionState } from "./mail-actions";
 
-// Bouton « Envoyer une présentation » (DIRIGEANT) → aperçu (objet + corps rendus) puis envoi.
-// L'aperçu utilise le MÊME gabarit pur que l'envoi serveur (rendu identique).
+// Bouton « Envoyer une présentation » (tout utilisateur authentifié) → aperçu (objet + corps
+// rendus) puis envoi. L'aperçu utilise le MÊME gabarit pur que l'envoi serveur (rendu identique).
 export function PresentationEmail({ prospect }: { prospect: ProspectDTO }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<MailActionState | null>(null);

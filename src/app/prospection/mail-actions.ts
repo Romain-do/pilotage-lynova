@@ -1,14 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireDirigeant } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { isMsGraphConnected } from "@/lib/msgraph/auth";
 import { sendMail } from "@/lib/msgraph/mail";
 import { GraphError } from "@/lib/msgraph/graph";
 import { presentationEmail, PRESENTATION_CC } from "@/lib/email/templates";
 
-// Envoi de l'e-mail de présentation (E). DIRIGEANT seul — part du compte connecté
-// (romain@lynova.net). Joignable en POST direct → re-vérifie l'autorisation côté serveur.
+// Envoi de l'e-mail de présentation (E). Tout utilisateur authentifié — part du compte
+// Microsoft partagé (signature « Romain IOLI » inchangée). Joignable en POST direct →
+// re-vérifie l'authentification côté serveur (requireUser).
 
 export interface MailActionState {
   ok: boolean;
@@ -17,7 +18,7 @@ export interface MailActionState {
 
 /** Envoie la présentation au prospect (CC meganne@leaya.fr). Contenu reconstruit en base. */
 export async function sendPresentationEmail(prospectId: string): Promise<MailActionState> {
-  await requireDirigeant();
+  await requireUser();
 
   const prospect = await prisma.prospect.findUnique({
     where: { id: prospectId },
