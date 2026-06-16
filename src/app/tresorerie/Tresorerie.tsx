@@ -38,6 +38,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { LeayaCard } from "@/components/LeayaCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { TresoAreaChart, Line, niceCeil, type SeriePoint } from "@/components/TresoAreaChart";
+import { useChartSelection } from "@/components/useChartSelection";
 import { RefreshButton } from "@/components/RefreshButton";
 
 interface Data {
@@ -244,7 +245,7 @@ function AccountsList({ accounts }: { accounts: TAccount[] }) {
 
 /* ───────────── Graphe 2 — Flux nets mensuels (barres sur base zéro) ───────────── */
 function FluxBarsChart({ series }: { series: SeriePoint[] }) {
-  const [hover, setHover] = useState<number | null>(null);
+  const { active: sel, pinned, handlers, leave, close } = useChartSelection();
   const n = series.length;
   if (n === 0) return <p className="mt-6 text-center text-sm text-ink-3">Aucune donnée sur la période.</p>;
 
@@ -256,16 +257,16 @@ function FluxBarsChart({ series }: { series: SeriePoint[] }) {
   const ariaLabel = `Flux nets mensuels sur ${n} mois : ${pos} mois positifs, ${n - pos} négatifs ou nuls ; entrées totales ${euro(totalIn)}, sorties totales ${euro(totalOut)}, net ${euro(totalIn + totalOut)}.`;
 
   return (
-    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
+    <div className="relative mt-3 select-none" onMouseLeave={leave} role="group" aria-label={ariaLabel}>
       <div className="relative h-44">
         {/* Demi-hauteur positive (les colonnes prennent toute la hauteur → les % de barre se résolvent) */}
         <div className="flex h-1/2 gap-1.5">
           {series.map((s, i) => {
             const net = nets[i];
             const h = net > 0 ? (net / niceMax) * 100 : 0;
-            const active = hover === null || hover === i;
+            const active = sel === null || sel === i;
             return (
-              <div key={s.key} className="flex h-full flex-1 items-end justify-center" onMouseEnter={() => setHover(i)}>
+              <div key={s.key} className="flex h-full flex-1 items-end justify-center">
                 {net > 0 && (
                   <div className={`w-full max-w-[28px] origin-bottom rounded-t-md bg-emerald-400 transition-opacity motion-safe:animate-[grow-up_0.5s_ease-out] ${active ? "" : "opacity-40"}`}
                     style={{ height: `${h}%` }} />
@@ -281,9 +282,9 @@ function FluxBarsChart({ series }: { series: SeriePoint[] }) {
           {series.map((s, i) => {
             const net = nets[i];
             const h = net < 0 ? (Math.abs(net) / niceMax) * 100 : 0;
-            const active = hover === null || hover === i;
+            const active = sel === null || sel === i;
             return (
-              <div key={s.key} className="flex h-full flex-1 items-start justify-center" onMouseEnter={() => setHover(i)}>
+              <div key={s.key} className="flex h-full flex-1 items-start justify-center">
                 {net < 0 && (
                   <div className={`w-full max-w-[28px] origin-top rounded-b-md bg-red-400 transition-opacity motion-safe:animate-[grow-up_0.5s_ease-out] ${active ? "" : "opacity-40"}`}
                     style={{ height: `${h}%` }} />
@@ -292,24 +293,43 @@ function FluxBarsChart({ series }: { series: SeriePoint[] }) {
             );
           })}
         </div>
+        {/* Colonnes interactives (souris + focus clavier + tap) superposées aux deux demi-hauteurs */}
+        <div className="absolute inset-0 flex gap-1.5">
+          {series.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              {...handlers(i)}
+              aria-label={`${s.label} : entrées ${euro(s.inflow)}, sorties ${euro(s.outflow)}, net ${euro(nets[i])}.`}
+              aria-pressed={pinned === i}
+              className="h-full flex-1 cursor-pointer rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-inset"
+            />
+          ))}
+        </div>
       </div>
       {/* Axe des mois */}
       <div className="mt-1 flex gap-1.5">
         {series.map((s, i) => (
           <div key={s.key} className="flex-1 text-center">
-            {(n <= 14 || i % 2 === 0) && <span className={`text-[9px] ${hover === i ? "font-semibold text-ink" : "text-ink-3"}`}>{s.label}</span>}
+            {(n <= 14 || i % 2 === 0) && <span className={`text-[9px] ${sel === i ? "font-semibold text-ink" : "text-ink-3"}`}>{s.label}</span>}
           </div>
         ))}
       </div>
       {/* Tooltip */}
-      {hover !== null && (
-        <div className="pointer-events-none absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-2.5 text-xs shadow-card-hover"
-          style={{ left: `${((hover + 0.5) / n) * 100}%`, ...(hover > n * 0.66 ? { transform: "translateX(-90%)" } : {}) }}>
-          <div className="font-semibold text-ink">{series[hover].label}</div>
+      {sel !== null && (
+        <div className={`absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-2.5 text-xs shadow-card-hover ${pinned ? "pointer-events-auto" : "pointer-events-none"}`}
+          style={{ left: `${((sel + 0.5) / n) * 100}%`, ...(sel > n * 0.66 ? { transform: "translateX(-90%)" } : {}) }}>
+          {pinned && (
+            <button type="button" onClick={close} aria-label="Fermer le détail"
+              className="absolute right-1.5 top-1.5 rounded p-0.5 text-ink-3 hover:bg-cloud hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
+              <IconX size={13} />
+            </button>
+          )}
+          <div className="pr-4 font-semibold text-ink">{series[sel].label}</div>
           <div className="mt-1.5 space-y-1">
-            <Line label="Entrées" value={euro(series[hover].inflow)} />
-            <Line label="Sorties" value={euro(series[hover].outflow)} />
-            <Line label="Net" value={euro(nets[hover])} strong />
+            <Line label="Entrées" value={euro(series[sel].inflow)} />
+            <Line label="Sorties" value={euro(series[sel].outflow)} />
+            <Line label="Net" value={euro(nets[sel])} strong />
           </div>
         </div>
       )}

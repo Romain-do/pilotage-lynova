@@ -180,7 +180,7 @@ export function Facturation({
       {/* ───────── Stats secondaires (même gabarit KpiCard, comparaison N-1) ───────── */}
       <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard icon={<IconChartBar size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA moyen / mois" value={euro(avg)} delta={rel(avg, avgPrev)} />
-        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats moyens HT / mois" value={euro(achatsAvg)} delta={rel(achatsAvg, achatsAvgPrev)} />
+        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats moyens HT / mois" value={euro(achatsAvg)} delta={rel(achatsAvg, achatsAvgPrev)} positiveIsGood={false} />
         <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)} />
         <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1" />
       </div>
@@ -374,6 +374,8 @@ function MargeNetteCard({
   caHtTotal: number;
   net: RevolutCharges;
 }) {
+  // Détail accessible souris (group-hover), tactile & clavier (toggle `open` + ×).
+  const [open, setOpen] = useState(false);
   return (
     <div className="group relative rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex items-center gap-2">
@@ -398,10 +400,34 @@ function MargeNetteCard({
               </span>
             )}
           </div>
-          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">CA HT − charges TTC (approché) · depuis nov. 2024</p>
-          {/* Détail au survol : ventilation des charges Revolut par catégorie */}
-          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden max-h-80 w-64 -translate-x-1/2 overflow-auto rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block">
-            <div className="font-semibold text-ink">Marge nette = CA HT − charges d&apos;exploitation (TTC)</div>
+          <div className="mt-1 flex items-baseline justify-between gap-2">
+            <p className="text-[10px] italic leading-tight text-ink-3">CA HT − charges TTC (approché) · depuis nov. 2024</p>
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-controls="marge-nette-detail"
+              className="flex-none rounded text-[10px] font-medium text-cyan-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+            >
+              {open ? "Masquer" : "Détail"}
+            </button>
+          </div>
+          {/* Détail : survol souris (group-hover) + ouverture tactile/clavier (open) */}
+          <div
+            id="marge-nette-detail"
+            className={`absolute left-1/2 top-full z-20 mt-1 max-h-80 w-64 -translate-x-1/2 overflow-auto rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block ${open ? "pointer-events-auto block" : "pointer-events-none hidden"}`}
+          >
+            {open && (
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Fermer le détail"
+                className="absolute right-1.5 top-1.5 rounded p-0.5 text-ink-3 hover:bg-cloud hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+              >
+                <IconX size={13} />
+              </button>
+            )}
+            <div className="pr-4 font-semibold text-ink">Marge nette = CA HT − charges d&apos;exploitation (TTC)</div>
             <div className="mt-2 space-y-1">
               <TipRow label="CA HT" value={euro(caHtTotal)} />
               <div className="my-1 border-t border-line" />

@@ -136,7 +136,7 @@ export function Cockpit({
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
               value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
-              delta={f.hasBank ? f.remuDelta : null}
+              delta={f.hasBank ? f.remuDelta : null} deltaNeutral
               foot={f.hasBank ? "versée sur l'exercice (Revolut)" : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
               value={f.hasBank && f.tauxNette != null ? `${f.tauxNette.toFixed(1)} %` : "n/a"} muted={!f.hasBank}
