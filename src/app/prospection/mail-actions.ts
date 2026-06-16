@@ -69,8 +69,15 @@ async function fetchPresentationPdfBase64(): Promise<{ contentBytes: string } | 
   try {
     const res = await fetch(`${base}${PDF_PUBLIC_PATH}`, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return { error: `Présentation PDF introuvable (HTTP ${res.status}).` };
-    const bytes = Buffer.from(await res.arrayBuffer()).toString("base64");
-    return { contentBytes: bytes };
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Garde anti-corruption : on n'attache QUE si c'est réellement un PDF (magic bytes « %PDF »).
+    // Sinon (ex. middleware → page /login HTML), on échoue clairement au lieu de joindre du HTML.
+    if (buf.subarray(0, 4).toString("latin1") !== "%PDF") {
+      const ct = res.headers.get("content-type") ?? "inconnu";
+      console.error(`[msgraph] fetchPresentationPdf: réponse non-PDF (content-type: ${ct}, ${buf.length} o)`);
+      return { error: "Le fichier récupéré n'est pas un PDF (réponse inattendue). Vérifiez l'accès public au PDF." };
+    }
+    return { contentBytes: buf.toString("base64") };
   } catch (e) {
     console.error("[msgraph] fetchPresentationPdf:", e instanceof Error ? e.message : e);
     return { error: "Impossible de récupérer la présentation PDF." };
