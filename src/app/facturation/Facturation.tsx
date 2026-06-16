@@ -7,7 +7,6 @@ import {
   IconReportMoney,
   IconPercentage,
   IconRepeat,
-  IconChartBar,
   IconShoppingCart,
   IconCash,
   IconClock,
@@ -123,11 +122,8 @@ export function Facturation({
   const tauxNetteDeltaPts =
     hasBank && hasBankPrev && tauxNette != null && tauxNettePrev != null ? tauxNette - tauxNettePrev : null;
 
-  const months = Math.max(1, cur.months.length);
-  const avg = cur.caHtTotal / months;
-  const avgPrev = prev.caHtTotal / Math.max(1, prev.months.length);
+  const months = Math.max(1, cur.months.length); // nb de mois de la période (pour les ⌀/mois)
   const achatsAvg = cur.achatsHt / months;
-  const achatsAvgPrev = prev.achatsHt / Math.max(1, prev.months.length);
 
   // Graphe « CA HT mensuel — exercice en cours vs N-1 » (axe fiscal oct→sept, indépendant du sélecteur).
   const fyNow = fyOf(todayISO);
@@ -165,7 +161,7 @@ export function Facturation({
 
       {/* ───────── KPI principaux ───────── */}
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} />
+        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} foot={`⌀ ${euro(cur.caHt / months)}/mois`} />
         <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge commerciale" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)} />
         <MargeNetteCard
           hasBank={hasBank}
@@ -189,9 +185,8 @@ export function Facturation({
       </div>
 
       {/* ───────── Stats secondaires (même gabarit KpiCard, comparaison N-1) ───────── */}
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard icon={<IconChartBar size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA moyen / mois" value={euro(avg)} delta={rel(avg, avgPrev)} />
-        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats moyens HT / mois" value={euro(achatsAvg)} delta={rel(achatsAvg, achatsAvgPrev)} positiveIsGood={false} />
+      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats HT" value={euro(cur.achatsHt)} delta={rel(cur.achatsHt, prev.achatsHt)} positiveIsGood={false} foot={`⌀ ${euro(achatsAvg)}/mois`} />
         <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)} />
         <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1" />
       </div>
