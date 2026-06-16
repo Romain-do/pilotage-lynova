@@ -18,7 +18,7 @@ import {
 import { getTresorerie } from "@/lib/tresorerie-data";
 import { getEvolizInvoices, getEvolizBuys } from "@/lib/facturation-data";
 import { getCockpitProspection } from "@/lib/prospection-data";
-import { lastSyncAll } from "@/lib/sync-state";
+import { lastSyncAll, sourceFreshness, staleSourcesLabel } from "@/lib/sync-state";
 import {
   flowsInRange,
   netChargesInRange,
@@ -61,12 +61,13 @@ const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
 async function buildCockpitData(): Promise<CockpitData> {
   const todayISO = new Date().toISOString().slice(0, 10);
 
-  const [docs, buysData, treso, rows, lastSync] = await Promise.all([
+  const [docs, buysData, treso, rows, lastSync, freshness] = await Promise.all([
     getEvolizInvoices(),
     getEvolizBuys(),
     getTresorerie(),
     getCockpitProspection(),
     lastSyncAll(prisma),
+    sourceFreshness(prisma),
   ]);
 
   const buys = buysData.buys;
@@ -166,6 +167,10 @@ async function buildCockpitData(): Promise<CockpitData> {
     fyLabel: fyLabel(fy),
     fy,
     lastSync,
+    freshness,
+    // Mention « partiellement à jour » pour les indicateurs composites (Evoliz × Revolut) si une
+    // source est périmée — seulement quand la marge nette est effectivement affichée (hasBank).
+    staleNote: hasBank ? (staleSourcesLabel(freshness) ? `Partiellement à jour — ${staleSourcesLabel(freshness)}` : undefined) : undefined,
     leaya,
     leayaPrev,
     caFyCur,

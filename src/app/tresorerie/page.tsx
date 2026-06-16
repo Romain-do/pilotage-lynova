@@ -1,7 +1,7 @@
 import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTresorerie } from "@/lib/tresorerie-data";
-import { lastSyncAll } from "@/lib/sync-state";
+import { lastSyncAll, sourceFreshness } from "@/lib/sync-state";
 import { AppNav } from "@/components/AppNav";
 import { Tresorerie } from "./Tresorerie";
 
@@ -12,7 +12,7 @@ export const maxDuration = 60;
 
 export default async function TresoreriePage() {
   await requireDirigeant();
-  const [data, lastSync] = await Promise.all([getTresorerie(), lastSyncAll(prisma)]);
+  const [data, lastSync, freshness] = await Promise.all([getTresorerie(), lastSyncAll(prisma), sourceFreshness(prisma)]);
   data.lastSync = lastSync; // « maj » globale (Evoliz + Revolut), cohérente avec le bouton unifié
   const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -28,7 +28,7 @@ export default async function TresoreriePage() {
           </p>
         </section>
       ) : (
-        <Tresorerie data={data} todayISO={todayISO} />
+        <Tresorerie data={data} todayISO={todayISO} freshness={freshness} />
       )}
     </main>
   );

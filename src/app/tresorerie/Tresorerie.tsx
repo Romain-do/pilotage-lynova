@@ -40,6 +40,7 @@ import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { TresoAreaChart, Line, niceCeil, type SeriePoint } from "@/components/TresoAreaChart";
 import { useChartSelection } from "@/components/useChartSelection";
 import { RefreshButton } from "@/components/RefreshButton";
+import type { Freshness } from "@/lib/sync-state";
 
 interface Data {
   accounts: TAccount[];
@@ -55,7 +56,7 @@ type Period =
 
 const PRESETS: PresetKey[] = ["current-month", "current-quarter", "last-12-months"];
 
-export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string }) {
+export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO: string; freshness: Freshness }) {
   const fyList = useMemo(() => fiscalYearsFromMonths(data.months), [data.months]);
   const [period, setPeriod] = useState<Period>(() =>
     fyList.length ? { kind: "fy", fy: fyList[0] } : { kind: "preset", key: "last-12-months" }
@@ -118,7 +119,7 @@ export function Tresorerie({ data, todayISO }: { data: Data; todayISO: string })
                 Perso
               </button>
             </div>
-            <RefreshButton initialLastSync={data.lastSync} />
+            <RefreshButton initialLastSync={data.lastSync} freshness={freshness} />
           </div>
           {customOpen && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">

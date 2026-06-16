@@ -13,6 +13,7 @@ import {
   IconClock,
   IconArrowUpRight,
   IconArrowDownRight,
+  IconAlertTriangle,
   IconX,
 } from "@tabler/icons-react";
 import {
@@ -41,6 +42,7 @@ import {
   type CatRow,
 } from "@/lib/facturation";
 import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, remuByFiscalMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
+import { staleSourcesLabel, type Freshness } from "@/lib/sync-state";
 import { KpiCard } from "@/components/KpiCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, CHARGE_META } from "@/components/CaVsChargesChart";
@@ -65,6 +67,7 @@ export function Facturation({
   outflows,
   todayISO,
   lastSync,
+  freshness,
 }: {
   docs: FactDoc[];
   buys: BuyDoc[];
@@ -72,6 +75,7 @@ export function Facturation({
   outflows: OutflowRow[];
   todayISO: string;
   lastSync: string | null;
+  freshness: Freshness;
 }) {
   const fyList = useMemo(() => listFiscalYears(docs), [docs]);
   const [period, setPeriod] = useState<Period>({ kind: "fy", fy: fyList[0] ?? fyOf(todayISO) });
@@ -108,6 +112,9 @@ export function Facturation({
   // Données bancaires dispo si la plage atteint au moins le début du cache Revolut.
   const hasBank = bankStart != null && range.end >= bankStart;
   const hasBankPrev = bankStart != null && shiftYear(range).end >= bankStart;
+  // Indicateur composite (marge nette = CA Evoliz × charges Revolut) : mention si une source est périmée.
+  const staleLabel = staleSourcesLabel(freshness);
+  const staleNote = hasBank && staleLabel ? `Partiellement à jour — ${staleLabel}` : undefined;
   const margeNette = cur.caHtTotal - netCur.total;
   const margeNettePrev = prev.caHtTotal - netPrev.total;
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
@@ -151,6 +158,7 @@ export function Facturation({
           filter={filter}
           setFilter={setFilter}
           lastSync={lastSync}
+          freshness={freshness}
         />
       </div>
 
@@ -164,6 +172,7 @@ export function Facturation({
           delta={hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null}
           caHtTotal={cur.caHtTotal}
           net={netCur}
+          staleNote={staleNote}
         />
         <KpiCard
           icon={<IconPercentage size={18} stroke={2} />}
@@ -173,6 +182,7 @@ export function Facturation({
           muted={!hasBank}
           delta={tauxNetteDeltaPts}
           deltaUnit="pts"
+          staleNote={staleNote}
         />
         <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct} />
       </div>
@@ -292,6 +302,7 @@ function Toolbar({
   filter,
   setFilter,
   lastSync,
+  freshness,
 }: {
   fyList: number[];
   period: Period;
@@ -299,6 +310,7 @@ function Toolbar({
   filter: TypeFilter;
   setFilter: (f: TypeFilter) => void;
   lastSync: string | null;
+  freshness: Freshness;
 }) {
   const [customOpen, setCustomOpen] = useState(period.kind === "custom");
   return (
@@ -338,7 +350,7 @@ function Toolbar({
           ))}
         </div>
 
-        <RefreshButton initialLastSync={lastSync} />
+        <RefreshButton initialLastSync={lastSync} freshness={freshness} />
       </div>
 
       {customOpen && (
@@ -368,11 +380,12 @@ function Toolbar({
 // Carte « Marge nette » = CA HT − charges Revolut (tous décaissements externes hors deny-list
 // TVA/IS). Grise et explicite si la plage précède les données bancaires (nov. 2024).
 function MargeNetteCard({
-  hasBank, value, delta, caHtTotal, net,
+  hasBank, value, delta, caHtTotal, net, staleNote,
 }: {
   hasBank: boolean; value: number; delta: number | null;
   caHtTotal: number;
   net: RevolutCharges;
+  staleNote?: string;
 }) {
   // Détail accessible souris (group-hover), tactile & clavier (toggle `open` + ×).
   const [open, setOpen] = useState(false);
@@ -400,6 +413,11 @@ function MargeNetteCard({
               </span>
             )}
           </div>
+          {staleNote && (
+            <div className="mt-1 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+              <IconAlertTriangle size={11} stroke={2.5} /> {staleNote}
+            </div>
+          )}
           <div className="mt-1 flex items-baseline justify-between gap-2">
             <p className="text-[10px] italic leading-tight text-ink-3">CA HT − charges TTC (approché) · depuis nov. 2024</p>
             <button
