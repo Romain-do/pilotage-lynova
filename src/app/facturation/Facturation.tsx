@@ -41,12 +41,13 @@ import {
   type PresetKey,
   type CatRow,
 } from "@/lib/facturation";
-import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, remuByFiscalMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
+import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
 import { staleSourcesLabel, type Freshness } from "@/lib/sync-state";
 import { KpiCard } from "@/components/KpiCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, CHARGE_META } from "@/components/CaVsChargesChart";
 import { RefreshButton } from "@/components/RefreshButton";
+import { InfoTip } from "@/components/InfoTip";
 
 const TYPES: { key: TypeFilter; label: string }[] = [
   { key: "all", label: "Tout" },
@@ -129,9 +130,6 @@ export function Facturation({
   const fyNow = fyOf(todayISO);
   const caFyCur = useMemo(() => caHtByFiscalMonth(docs, fyNow), [docs, fyNow]);
   const caFyPrev = useMemo(() => caHtByFiscalMonth(docs, fyNow - 1), [docs, fyNow]);
-  // Rémunération (décaissements Revolut « Rémunération ») par mois fiscal — exercice vs N-1.
-  const remuFyCur = useMemo(() => remuByFiscalMonth(outflows, fyNow), [outflows, fyNow]);
-  const remuFyPrev = useMemo(() => remuByFiscalMonth(outflows, fyNow - 1), [outflows, fyNow]);
 
   const sortedClients = useMemo(
     () => [...clients].sort((a, b) => (clientSort === "ca" ? b.ca - a.ca : b.aboHt - a.aboHt)).slice(0, 12),
@@ -198,8 +196,13 @@ export function Facturation({
             <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
             <ChargesLegend />
           </div>
-          <p className="mt-0.5 text-xs text-ink-3">
-            CA en HT · charges &amp; dépenses en TTC (montants réellement décaissés) · CA − charges d&apos;exploitation = marge nette · TVA/IS hors exploitation
+          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-ink-3">
+            CA HT vs charges — marge nette du mois
+            <InfoTip label="Détail CA vs charges">
+              <strong className="font-semibold text-ink">CA</strong> en HT ; <strong className="font-semibold text-ink">charges &amp; dépenses</strong> en TTC
+              (montants réellement décaissés). Marge nette = CA HT − charges d&apos;exploitation. <strong className="font-semibold text-ink">TVA</strong> reversée
+              &amp; <strong className="font-semibold text-ink">IS</strong> affichés hors exploitation (visuels, hors marge).
+            </InfoTip>
           </p>
           <CaVsChargesChart
             data={{
@@ -228,18 +231,7 @@ export function Facturation({
         <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
       </div>
 
-      {/* ───────── Évolution rémunération — exercice vs N-1 ───────── */}
-      <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink">Évolution rémunération — exercice {fyNow} vs {fyNow - 1}</h2>
-          <div className="flex items-center gap-3 text-xs text-ink-2">
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
-          </div>
-        </div>
-        <p className="mt-0.5 text-xs text-ink-3">Décaissements Revolut « Rémunération » · captés depuis nov. 2024</p>
-        <CaVsN1Chart current={remuFyCur} previous={remuFyPrev} fy={fyNow} unitLabel="Rémunération" />
-      </div>
+      {/* « Évolution rémunération » retirée d'Evoliz (donnée bancaire) → visible sur Revolut + Cockpit. */}
 
       {/* ───────── Clients + Catégories ───────── */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -259,23 +251,26 @@ export function Facturation({
         </div>
 
         <div className="rounded-card border border-line bg-white p-4 shadow-card">
-          <h2 className="text-sm font-semibold text-ink">Achats par catégorie</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-ink">Achats par catégorie</h2>
+            <InfoTip label="À propos des achats par catégorie">
+              L&apos;<strong className="font-semibold text-ink">électricité</strong> (captée via Revolut) est exclue
+              de la marge commerciale Evoliz pour éviter le double comptage.
+            </InfoTip>
+          </div>
           <p className="text-xs text-ink-3">Cliquez une catégorie pour le détail</p>
-          <p className="mt-0.5 text-xs italic text-ink-3">
-            Électricité (captée via Revolut) — exclue de la marge commerciale Evoliz
-          </p>
           <CategoryBreakdown cats={cats} onPick={setDrill} />
         </div>
       </div>
 
-      <p className="mt-4 text-xs text-ink-3">
-        CA en <strong className="text-ink-2">HT brut</strong> (factures validées, avoirs non déduits) ·
-        marge <strong className="text-ink-2">commerciale</strong> = CA − achats fournisseurs Evoliz ·
-        marge <strong className="text-ink-2">nette</strong> = CA HT − charges d&apos;exploitation Revolut en{" "}
-        <strong className="text-ink-2">TTC</strong> (décaissements réellement sortis, hors TVA &amp; impôt sociétés, URSSAF incluse) ·
-        la <strong className="text-ink-2">TVA</strong> reversée à l&apos;État et l&apos;<strong className="text-ink-2">IS</strong> sont
-        affichés <strong className="text-ink-2">hors exploitation</strong> (visuels, hors marge) ·
-        « encaissé / restant dû » en <strong className="text-ink-2">TTC</strong>.
+      <p className="mt-4 flex flex-wrap items-center gap-1 text-xs text-ink-3">
+        CA en <strong className="text-ink-2">HT brut</strong> · marges commerciale &amp; nette · encaissé / restant dû en <strong className="text-ink-2">TTC</strong>.
+        <InfoTip label="Définitions des indicateurs">
+          <span className="block"><strong className="font-semibold text-ink">CA HT brut</strong> : factures validées, avoirs non déduits.</span>
+          <span className="mt-1 block">Marge <strong className="font-semibold text-ink">commerciale</strong> = CA − achats fournisseurs Evoliz.</span>
+          <span className="mt-1 block">Marge <strong className="font-semibold text-ink">nette</strong> = CA HT − charges d&apos;exploitation Revolut en TTC (décaissements réellement sortis, hors TVA &amp; IS, URSSAF incluse).</span>
+          <span className="mt-1 block">La <strong className="font-semibold text-ink">TVA</strong> reversée et l&apos;<strong className="font-semibold text-ink">IS</strong> sont affichés hors exploitation (visuels, hors marge).</span>
+        </InfoTip>
       </p>
 
       {drill && (

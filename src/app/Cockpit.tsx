@@ -24,6 +24,7 @@ import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, type ChargeSeries } from "@/components/CaVsChargesChart";
 import { TresoAreaChart, type SeriePoint } from "@/components/TresoAreaChart";
 import { RefreshButton } from "@/components/RefreshButton";
+import { InfoTip } from "@/components/InfoTip";
 import { euro } from "@/lib/facturation";
 import { prospectTitle, prospectContactName } from "@/lib/prospection";
 import type { Freshness } from "@/lib/sync-state";
@@ -188,8 +189,13 @@ export function Cockpit({
             <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
             <ChargesLegend />
           </div>
-          <p className="mt-0.5 text-xs text-ink-3">
-            CA en HT · charges &amp; dépenses en TTC (montants réellement décaissés) · CA − charges d&apos;exploitation = marge nette · TVA/IS hors exploitation · exercice {data.fy}
+          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-ink-3">
+            CA HT vs charges — marge nette du mois · exercice {data.fy}
+            <InfoTip label="Détail CA vs charges">
+              <strong className="font-semibold text-ink">CA</strong> en HT ; <strong className="font-semibold text-ink">charges &amp; dépenses</strong> en TTC
+              (montants réellement décaissés). Marge nette = CA HT − charges d&apos;exploitation. <strong className="font-semibold text-ink">TVA</strong> reversée
+              &amp; <strong className="font-semibold text-ink">IS</strong> affichés hors exploitation (visuels, hors marge).
+            </InfoTip>
           </p>
           <CaVsChargesChart data={data.caVsCharges} bankStart={data.bankStart} />
         </div>

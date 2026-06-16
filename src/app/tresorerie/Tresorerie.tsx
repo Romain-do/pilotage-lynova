@@ -146,7 +146,18 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
           value={euro(fiatEur)} foot="EUR + devises converties" />
         <KpiCard icon={<IconCurrencyBitcoin size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="P&L crypto (global)"
           value={euro(p.pnl)} delta={p.pct} deltaLabel="rendement"
-          foot={`~${euro(p.transferredOutValue)} de crypto transférée hors plateforme — estimation à ±${euro(p.transferredOutValue)} près`} />
+          foot="gain/perte depuis l'origine · estimation"
+          info={
+            p.transferredOutValue > 0 ? (
+              <>
+                Estimation : environ {euro(p.transferredOutValue)} de crypto sont sortis de la plateforme (vers un
+                portefeuille externe), valorisés au cours du moment. Le P&amp;L réel peut donc varier d&apos;environ
+                ±{euro(p.transferredOutValue)}.
+              </>
+            ) : (
+              <>P&amp;L = valeur actuelle des cryptos + ventes encaissées − montants investis, depuis l&apos;origine.</>
+            )
+          } />
         <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Cash net de la période"
           value={euro(flows.net)} delta={flowsPrev.net !== 0 ? rel(flows.net, flowsPrev.net) : null}
           foot={`entrées ${euro(flows.inflow)} · sorties ${euro(flows.outflow)}`} />

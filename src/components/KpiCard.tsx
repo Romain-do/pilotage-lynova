@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { IconArrowUpRight, IconArrowDownRight, IconAlertTriangle } from "@tabler/icons-react";
+import { InfoTip } from "@/components/InfoTip";
 
 // Carte KPI partagée (charte Lynova) — même gabarit que Facturation / Trésorerie.
 // `muted` grise la valeur (état « n/a »). `foot` remplace la ligne « Vs N-1 : — »
@@ -11,8 +12,9 @@ import { IconArrowUpRight, IconArrowDownRight, IconAlertTriangle } from "@tabler
 // La flèche reflète toujours le sens réel de variation, seule la couleur (ou son absence) juge.
 // `staleNote` (optionnel) : mention ambre sous le KPI quand une source d'un indicateur COMPOSITE
 // est périmée (ex. marge nette = Evoliz × Revolut) → ne pas présenter le chiffre comme fiable.
+// `info` (optionnel) : contenu d'une infobulle « ⓘ » à côté du label (détail technique déporté).
 export function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false, staleNote,
+  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false, staleNote, info,
 }: {
   icon: ReactNode;
   tint: string;
@@ -26,6 +28,7 @@ export function KpiCard({
   positiveIsGood?: boolean;
   deltaNeutral?: boolean;
   staleNote?: string;
+  info?: ReactNode;
 }) {
   const isGood = delta != null && (positiveIsGood ? delta >= 0 : delta <= 0);
   const badgeClass = deltaNeutral
@@ -35,7 +38,8 @@ export function KpiCard({
     <div className="group rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
-        <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
+        <span className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
+        {info && <span className="flex-none"><InfoTip label={`Détail : ${label}`}>{info}</InfoTip></span>}
       </div>
       <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
       <div className="mt-1.5 min-h-4 space-y-1 text-xs">
