@@ -40,7 +40,7 @@ import {
   type PresetKey,
   type CatRow,
 } from "@/lib/facturation";
-import { netChargesInRange, chargeComponentsByMonth, remuByFiscalMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
+import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, remuByFiscalMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
 import { KpiCard } from "@/components/KpiCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, CHARGE_META } from "@/components/CaVsChargesChart";
@@ -97,6 +97,8 @@ export function Facturation({
   // barre empilée « CA vs charges ». CA − charges = marge nette du mois (mêmes charges, même
   // deny-list que netChargesInRange).
   const chargeComps = useMemo(() => chargeComponentsByMonth(outflows, cur.months), [outflows, cur.months]);
+  // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
+  const horsExploit = useMemo(() => horsExploitationByMonth(outflows, cur.months), [outflows, cur.months]);
 
   // ── Marge nette = CA HT − charges Revolut (tous décaissements externes hors deny-list TVA/IS) ──
   // La marge COMMERCIALE (cur.marge = CA − achats Evoliz) reste séparée et inchangée.
@@ -190,13 +192,16 @@ export function Facturation({
             <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
             <ChargesLegend />
           </div>
-          <p className="mt-0.5 text-xs text-ink-3">CA − charges = marge nette du mois · charges = dépenses Revolut (hors TVA/IS)</p>
+          <p className="mt-0.5 text-xs text-ink-3">
+            CA en HT · charges &amp; dépenses en TTC (montants réellement décaissés) · CA − charges d&apos;exploitation = marge nette · TVA/IS hors exploitation
+          </p>
           <CaVsChargesChart
             data={{
               months: cur.months,
               abo: cur.aboByMonth,
               install: cur.installByMonth,
               charges: chargeComps,
+              horsExploit,
             }}
             bankStart={bankStart}
           />
@@ -260,9 +265,11 @@ export function Facturation({
       <p className="mt-4 text-xs text-ink-3">
         CA en <strong className="text-ink-2">HT brut</strong> (factures validées, avoirs non déduits) ·
         marge <strong className="text-ink-2">commerciale</strong> = CA − achats fournisseurs Evoliz ·
-        marge <strong className="text-ink-2">nette</strong> = CA HT − toutes les dépenses Revolut
-        (décaissements externes hors TVA &amp; impôt sociétés) · « encaissé / restant dû » en{" "}
-        <strong className="text-ink-2">TTC</strong>.
+        marge <strong className="text-ink-2">nette</strong> = CA HT − charges d&apos;exploitation Revolut en{" "}
+        <strong className="text-ink-2">TTC</strong> (décaissements réellement sortis, hors TVA &amp; impôt sociétés, URSSAF incluse) ·
+        la <strong className="text-ink-2">TVA</strong> reversée à l&apos;État et l&apos;<strong className="text-ink-2">IS</strong> sont
+        affichés <strong className="text-ink-2">hors exploitation</strong> (visuels, hors marge) ·
+        « encaissé / restant dû » en <strong className="text-ink-2">TTC</strong>.
       </p>
 
       {drill && (
@@ -391,10 +398,10 @@ function MargeNetteCard({
               </span>
             )}
           </div>
-          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">CA HT − dépenses Revolut (hors TVA/IS) · depuis nov. 2024</p>
+          <p className="mt-1 text-[10px] italic leading-tight text-ink-3">CA HT − charges TTC (approché) · depuis nov. 2024</p>
           {/* Détail au survol : ventilation des charges Revolut par catégorie */}
           <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden max-h-80 w-64 -translate-x-1/2 overflow-auto rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block">
-            <div className="font-semibold text-ink">Marge nette = CA HT − charges Revolut</div>
+            <div className="font-semibold text-ink">Marge nette = CA HT − charges d&apos;exploitation (TTC)</div>
             <div className="mt-2 space-y-1">
               <TipRow label="CA HT" value={euro(caHtTotal)} />
               <div className="my-1 border-t border-line" />

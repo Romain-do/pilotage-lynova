@@ -231,6 +231,32 @@ export function chargeComponentsByMonth(
   return out;
 }
 
+/** Reversements HORS EXPLOITATION (TVA collectée reversée à l'État, impôt sociétés) ventilés par
+ *  mois CIVIL, alignés sur `months`. PUREMENT VISUELS dans le graphe « CA vs charges » : ils
+ *  n'entrent NI dans `netChargesInRange` NI dans la marge nette (le CA est déjà en HT, la marge est
+ *  AVANT impôt sur les bénéfices). Servent à visualiser tout ce qui sort réellement du compte sans
+ *  fausser la marge. Mêmes outflows que la barre charges, mais on garde ici la deny-list. */
+export interface HorsExploitationSeries {
+  tva: number[];
+  is: number[];
+}
+export function horsExploitationByMonth(
+  outflows: OutflowRow[],
+  months: { key: string }[]
+): HorsExploitationSeries {
+  const idx = new Map(months.map((m, i) => [m.key, i]));
+  const tva = new Array(months.length).fill(0);
+  const is = new Array(months.length).fill(0);
+  for (const o of outflows) {
+    const i = idx.get(o.date.slice(0, 7));
+    if (i == null) continue;
+    const c = categorize(o.reference, o.counterparty);
+    if (c === "TVA") tva[i] += o.amount;
+    else if (c === "Impôt sociétés (IS)") is[i] += o.amount;
+  }
+  return { tva, is };
+}
+
 /** Date du plus ancien décaissement capté (début des données bancaires). */
 export function earliestOutflowDate(outflows: OutflowRow[]): string | null {
   let min: string | null = null;

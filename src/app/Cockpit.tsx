@@ -177,7 +177,9 @@ export function Cockpit({
             <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
             <ChargesLegend />
           </div>
-          <p className="mt-0.5 text-xs text-ink-3">CA − charges = marge nette du mois · exercice {data.fy}</p>
+          <p className="mt-0.5 text-xs text-ink-3">
+            CA en HT · charges &amp; dépenses en TTC (montants réellement décaissés) · CA − charges d&apos;exploitation = marge nette · TVA/IS hors exploitation · exercice {data.fy}
+          </p>
           <CaVsChargesChart data={data.caVsCharges} bankStart={data.bankStart} />
         </div>
 

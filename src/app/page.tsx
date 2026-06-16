@@ -23,6 +23,7 @@ import {
   flowsInRange,
   netChargesInRange,
   chargeComponentsByMonth,
+  horsExploitationByMonth,
   seriesForRange,
   earliestOutflowDate,
   leayaInRange,
@@ -102,11 +103,14 @@ async function buildCockpitData(): Promise<CockpitData> {
   const tresoSeries = seriesForRange(treso.months, range);
   // CA vs charges — mensuel HT (exercice en cours). Mêmes charges que la marge nette ⇒ cohérence.
   const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months);
+  // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
+  const horsExploit = horsExploitationByMonth(treso.outflows, cur.months);
   const caVsCharges = {
     months: cur.months,
     abo: cur.aboByMonth,
     install: cur.installByMonth,
     charges: chargeComps,
+    horsExploit,
   };
 
   // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
