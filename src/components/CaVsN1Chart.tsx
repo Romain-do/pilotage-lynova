@@ -3,9 +3,20 @@
 import { useState } from "react";
 import { euro, rel, FISCAL_MONTHS } from "@/lib/facturation";
 
-// Graphe « CA HT mensuel — exercice en cours vs N-1 ». Axe fiscal oct→sept (12 mois).
-// Barres : exercice = cyan, N-1 = gris. Tooltip mois + CA exercice + CA N-1 + écart.
-export function CaVsN1Chart({ current, previous, fy }: { current: number[]; previous: number[]; fy: number }) {
+// Graphe générique « <métrique> mensuel — exercice en cours vs N-1 ». Axe fiscal oct→sept (12 mois).
+// Barres : exercice = cyan, N-1 = gris. Tooltip mois + valeur exercice + valeur N-1 + écart.
+// `unitLabel` ne sert qu'à l'aria-label (ex. « CA HT », « Rémunération ») ; défaut « CA HT ».
+export function CaVsN1Chart({
+  current,
+  previous,
+  fy,
+  unitLabel = "CA HT",
+}: {
+  current: number[];
+  previous: number[];
+  fy: number;
+  unitLabel?: string;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...current, ...previous);
   const n = FISCAL_MONTHS.length;
@@ -16,7 +27,7 @@ export function CaVsN1Chart({ current, previous, fy }: { current: number[]; prev
       className="relative mt-3"
       onMouseLeave={() => setHover(null)}
       role="img"
-      aria-label={`CA HT mensuel, exercice ${fy} (${euro(sum(current))}) vs exercice ${fy - 1} (${euro(sum(previous))}), axe octobre à septembre.`}
+      aria-label={`${unitLabel} mensuel, exercice ${fy} (${euro(sum(current))}) vs exercice ${fy - 1} (${euro(sum(previous))}), axe octobre à septembre.`}
     >
       <div className="flex h-44 items-end gap-1 sm:gap-1.5">
         {FISCAL_MONTHS.map((label, i) => {
