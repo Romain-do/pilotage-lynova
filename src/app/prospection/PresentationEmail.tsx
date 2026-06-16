@@ -4,12 +4,23 @@ import { useState, useTransition } from "react";
 import type { ProspectDTO } from "@/lib/prospection";
 import { presentationEmail, PRESENTATION_CC } from "@/lib/email/templates";
 import { sendPresentationEmail, type MailActionState } from "./mail-actions";
+import { LastSent, ResendConfirm } from "./contact-sent";
 
 // Bouton « Envoyer une présentation » (tout utilisateur authentifié) → aperçu (objet + corps
 // rendus) puis envoi. L'aperçu utilise le MÊME gabarit pur que l'envoi serveur (rendu identique).
-export function PresentationEmail({ prospect }: { prospect: ProspectDTO }) {
+// `lastSentAt` / `onSent` : anti-doublon (mention « Dernier envoi » + confirmation avant renvoi).
+export function PresentationEmail({
+  prospect,
+  lastSentAt = null,
+  onSent,
+}: {
+  prospect: ProspectDTO;
+  lastSentAt?: string | null;
+  onSent?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<MailActionState | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
 
   const { subject, html } = presentationEmail(prospect);
@@ -17,7 +28,15 @@ export function PresentationEmail({ prospect }: { prospect: ProspectDTO }) {
 
   function send() {
     setResult(null);
-    start(async () => setResult(await sendPresentationEmail(prospect.id)));
+    start(async () => {
+      const r = await sendPresentationEmail(prospect.id);
+      setResult(r);
+      if (r.ok) { onSent?.(); setConfirming(false); }
+    });
+  }
+  function handleSendClick() {
+    if (lastSentAt && !confirming) { setConfirming(true); return; }
+    send();
   }
 
   if (!open) {
@@ -30,6 +49,7 @@ export function PresentationEmail({ prospect }: { prospect: ProspectDTO }) {
         >
           ✉️ Envoyer une présentation
         </button>
+        <LastSent iso={lastSentAt} />
       </div>
     );
   }
@@ -79,14 +99,20 @@ export function PresentationEmail({ prospect }: { prospect: ProspectDTO }) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={send}
-        disabled={pending || !to}
-        className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
-      >
-        {pending ? "Envoi…" : "Envoyer la présentation"}
-      </button>
+      <LastSent iso={lastSentAt} />
+
+      {confirming && lastSentAt ? (
+        <ResendConfirm iso={lastSentAt} onConfirm={send} onCancel={() => setConfirming(false)} pending={pending} />
+      ) : (
+        <button
+          type="button"
+          onClick={handleSendClick}
+          disabled={pending || !to}
+          className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
+        >
+          {pending ? "Envoi…" : "Envoyer la présentation"}
+        </button>
+      )}
     </div>
   );
 }

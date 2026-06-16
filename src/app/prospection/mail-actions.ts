@@ -1,11 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import type { ContactType } from "@prisma/client";
 import { requireUser, requireDirigeant } from "@/lib/auth";
 import { isMsGraphConnected } from "@/lib/msgraph/auth";
 import { sendMail } from "@/lib/msgraph/mail";
 import { GraphError } from "@/lib/msgraph/graph";
 import { presentationEmail, PRESENTATION_CC, rdvSynthesisEmail, RDV_SYNTHESIS_CC } from "@/lib/email/templates";
+import { emailsLive, TEST_RECIPIENT, testModeMessage } from "@/lib/email/delivery";
+import { logContact } from "@/lib/contact-log";
 
 // Envoi de l'e-mail de présentation (E). Tout utilisateur authentifié — part du compte
 // Microsoft partagé (signature « Romain IOLI » inchangée). Joignable en POST direct →
@@ -16,9 +19,10 @@ export interface MailActionState {
   message: string;
 }
 
-/** Envoie la présentation au prospect (CC meganne@leaya.fr). Contenu reconstruit en base. */
+/** Envoie la présentation au prospect (CC meganne@leaya.fr en live). Contenu reconstruit en base.
+ *  Mode test (EMAILS_LIVE ≠ true) : redirigé vers romain, sans CC. Trace l'envoi (ContactLog). */
 export async function sendPresentationEmail(prospectId: string): Promise<MailActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const prospect = await prisma.prospect.findUnique({
     where: { id: prospectId },
@@ -34,10 +38,16 @@ export async function sendPresentationEmail(prospectId: string): Promise<MailAct
   }
 
   const { subject, html } = presentationEmail(prospect);
+  const live = emailsLive();
+  const recipient = live ? to : TEST_RECIPIENT;
 
   try {
-    await sendMail({ subject, html, to: [to], cc: [PRESENTATION_CC] });
-    return { ok: true, message: `Présentation envoyée à ${to} (CC ${PRESENTATION_CC}).` };
+    await sendMail({ subject, html, to: [recipient], cc: live ? [PRESENTATION_CC] : [] });
+    await logContact({ prospectId, type: "PRESENTATION", recipient, live, sentById: user.id, sentByName: user.name });
+    return {
+      ok: true,
+      message: live ? `Présentation envoyée à ${to} (CC ${PRESENTATION_CC}).` : testModeMessage(to),
+    };
   } catch (e) {
     if (e instanceof GraphError) {
       console.error("[msgraph] sendPresentationEmail:", e.status, e.message);
@@ -60,7 +70,6 @@ export async function sendPresentationEmail(prospectId: string): Promise<MailAct
 
 const PDF_PUBLIC_PATH = "/presentation-lynova.pdf";
 const PDF_ATTACHMENT_NAME = "presentation-lynova.pdf";
-const RDV_TEST_RECIPIENT = "romain@lynova.net"; // destinataire en mode test (RDV_SYNTHESIS_LIVE ≠ true)
 
 /** Récupère la présentation PDF (public/ non garanti en serverless → fetch de l'URL publique) et
  *  l'encode en base64 pour une pièce jointe Graph « inline ». */
@@ -85,9 +94,10 @@ async function fetchPresentationPdfBase64(): Promise<{ contentBytes: string } | 
   }
 }
 
-/** Envoie la synthèse RDV au prospect (CC support@lynova.net) avec la présentation PDF jointe. */
+/** Envoie la synthèse RDV au prospect (CC support@lynova.net en live) avec la présentation PDF
+ *  jointe. Mode test : redirigé vers romain, sans CC. Trace l'envoi (ContactLog). */
 export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailActionState> {
-  await requireDirigeant();
+  const user = await requireDirigeant();
 
   const prospect = await prisma.prospect.findUnique({
     where: { id: prospectId },
@@ -105,10 +115,8 @@ export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailAct
   const pdf = await fetchPresentationPdfBase64();
   if ("error" in pdf) return { ok: false, message: pdf.error };
 
-  // ⚠️ SÉCURITÉ TEST : par défaut l'envoi est REDIRIGÉ vers romain@lynova.net (jamais un vrai
-  // prospect). Pour activer l'envoi réel en production, poser la variable d'env RDV_SYNTHESIS_LIVE=true.
-  const live = process.env.RDV_SYNTHESIS_LIVE === "true";
-  const recipient = live ? to : RDV_TEST_RECIPIENT;
+  const live = emailsLive();
+  const recipient = live ? to : TEST_RECIPIENT;
 
   const { subject, html } = rdvSynthesisEmail(prospect);
 
@@ -117,19 +125,15 @@ export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailAct
       subject,
       html,
       to: [recipient],
-      cc: [RDV_SYNTHESIS_CC],
+      cc: live ? [RDV_SYNTHESIS_CC] : [],
       attachments: [{ name: PDF_ATTACHMENT_NAME, contentType: "application/pdf", contentBytes: pdf.contentBytes }],
     });
+    await logContact({ prospectId, type: "RDV_SYNTHESIS", recipient, live, sentById: user.id, sentByName: user.name });
     if (live) {
       const who = prospect.company?.trim() || to;
       return { ok: true, message: `Synthèse RDV envoyée à ${who} (CC ${RDV_SYNTHESIS_CC}).` };
     }
-    // Mode test : on précise le prospect réel UNIQUEMENT s'il diffère de ton adresse (sinon redondant).
-    const realNote = to.toLowerCase() !== RDV_TEST_RECIPIENT ? ` (prospect réel : ${to}, non contacté)` : "";
-    return {
-      ok: true,
-      message: `Mode test — e-mail envoyé à toi (${RDV_TEST_RECIPIENT}), le prospect ne reçoit rien${realNote}.`,
-    };
+    return { ok: true, message: testModeMessage(to) };
   } catch (e) {
     if (e instanceof GraphError) {
       console.error("[msgraph] sendRdvSynthesisEmail:", e.status, e.message);
@@ -144,4 +148,30 @@ export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailAct
     console.error("[msgraph] sendRdvSynthesisEmail:", e instanceof Error ? e.message : e);
     return { ok: false, message: "Échec de l'envoi. Réessayez." };
   }
+}
+
+// ───────────────────────── Anti-double-envoi : dernier envoi par type ─────────────────────────
+
+export interface ProspectContactLog {
+  /** ISO du dernier envoi de chaque type pour ce prospect (ou null). */
+  presentation: string | null;
+  rdvSynthesis: string | null;
+  meeting: string | null;
+}
+
+/** Dernier envoi (sentAt) par type pour un prospect — alimente la mention « Dernier envoi le … »
+ *  et la confirmation avant renvoi dans la fiche. Tout utilisateur authentifié. */
+export async function getProspectContactLog(prospectId: string): Promise<ProspectContactLog> {
+  await requireUser();
+  const rows = await prisma.contactLog.findMany({
+    where: { prospectId },
+    orderBy: { sentAt: "desc" },
+    select: { type: true, sentAt: true },
+  });
+  const last = (t: ContactType) => rows.find((r) => r.type === t)?.sentAt.toISOString() ?? null;
+  return {
+    presentation: last("PRESENTATION"),
+    rdvSynthesis: last("RDV_SYNTHESIS"),
+    meeting: last("MEETING"),
+  };
 }

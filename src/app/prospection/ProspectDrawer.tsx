@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   isoToDateInput,
   formatDateFR,
@@ -10,6 +10,7 @@ import {
   type GroupDTO,
 } from "@/lib/prospection";
 import { updateProspect, addComment, archiveProspect } from "./actions";
+import { getProspectContactLog, type ProspectContactLog } from "./mail-actions";
 import { MeetingForm } from "./MeetingForm";
 import { DateSelect } from "./DateSelect";
 import { PresentationEmail } from "./PresentationEmail";
@@ -46,6 +47,25 @@ export function ProspectDrawer({
   const [saving, startSave] = useTransition();
   const [commenting, startComment] = useTransition();
   const [archiving, startArchive] = useTransition();
+
+  // Anti-doublon : dernier envoi par type (chargé à l'ouverture), maj optimiste après chaque envoi.
+  const [contactLog, setContactLog] = useState<ProspectContactLog | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getProspectContactLog(prospect.id)
+      .then((log) => { if (alive) setContactLog(log); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [prospect.id]);
+  function markSent(field: keyof ProspectContactLog) {
+    const now = new Date().toISOString();
+    setContactLog((c) => ({
+      presentation: c?.presentation ?? null,
+      rdvSynthesis: c?.rdvSynthesis ?? null,
+      meeting: c?.meeting ?? null,
+      [field]: now,
+    }));
+  }
 
   function save() {
     const fd = new FormData();
@@ -235,10 +255,12 @@ export function ProspectDrawer({
 
           {/* E-mails Outlook — accessibles à tout utilisateur authentifié (envoi depuis le
               compte Microsoft partagé ; les actions serveur re-vérifient l'auth via requireUser). */}
-          <PresentationEmail prospect={prospect} />
+          <PresentationEmail prospect={prospect} lastSentAt={contactLog?.presentation ?? null} onSent={() => markSent("presentation")} />
           {/* Synthèse RDV : DIRIGEANT uniquement (condition UI + garde serveur requireDirigeant). */}
-          {currentUser.role === "DIRIGEANT" && <RdvSynthesisEmail prospect={prospect} />}
-          <MeetingForm prospect={prospect} />
+          {currentUser.role === "DIRIGEANT" && (
+            <RdvSynthesisEmail prospect={prospect} lastSentAt={contactLog?.rdvSynthesis ?? null} onSent={() => markSent("rdvSynthesis")} />
+          )}
+          <MeetingForm prospect={prospect} lastSentAt={contactLog?.meeting ?? null} onSent={() => markSent("meeting")} />
 
           {/* Commentaires */}
           <div className="rounded-xl border border-navy/10 bg-white p-4">
