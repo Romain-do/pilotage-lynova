@@ -28,6 +28,7 @@ import {
   type GroupDTO,
   type CurrentUserDTO,
 } from "@/lib/prospection";
+import { pct1 } from "@/lib/facturation";
 import type { StageLite } from "./Prospection";
 import { DateSelect } from "./DateSelect";
 
@@ -103,9 +104,7 @@ export function ListView({
 
   const clientsActuels = counts.a_installer + counts.installes;
   const tauxReussite =
-    clientsActuels + counts.refus > 0
-      ? Math.round((clientsActuels / (clientsActuels + counts.refus)) * 100)
-      : 0;
+    clientsActuels + counts.refus > 0 ? (clientsActuels / (clientsActuels + counts.refus)) * 100 : 0;
   const kpiValue = (cats: KpiCategory[]) => cats.reduce((s, c) => s + counts[c], 0);
 
   const filtered = useMemo(() => {
@@ -249,7 +248,7 @@ export function ListView({
               <IconTrophy size={18} stroke={2} />
             </span>
             <span className="min-w-0">
-              <div className="text-xl font-semibold leading-none text-cyan">{tauxReussite}%</div>
+              <div className="text-xl font-semibold leading-none text-cyan">{pct1(tauxReussite)}%</div>
               <div className="mt-1 truncate text-xs font-medium text-white/70">Taux de réussite</div>
             </span>
           </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { IconX } from "@tabler/icons-react";
-import { euro, apportionEuros } from "@/lib/facturation";
+import { euro, apportionEuros, pct1 } from "@/lib/facturation";
 import { CHARGE_CATEGORIES, type ChargeCategory } from "@/lib/tresorerie";
 
 // Graphe « CA vs charges — mensuel HT ». Par mois : barre CA empilée (abonnement + installation)
@@ -350,7 +350,7 @@ function MonthDrawer({
                     <div key={r.label}>
                       <div className="flex items-baseline justify-between gap-2 text-sm">
                         <span className="truncate text-ink-2">{r.label}</span>
-                        <span className="flex-none font-medium text-ink">{euro(r.value)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span></span>
+                        <span className="flex-none font-medium text-ink">{euro(r.value)} <span className="font-normal text-ink-3">· {pct1(pct)} %</span></span>
                       </div>
                       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
                         <div className={`h-full rounded-full ${CHARGES_COLOR} transition-all duration-500`} style={{ width: `${Math.max(2, (r.raw / maxRaw) * 100)}%` }} />
@@ -398,7 +398,7 @@ function MonthDrawer({
                   <span className="text-xs font-medium uppercase tracking-wide text-ink-3">Marge nette</span>
                   <span className="text-base font-semibold text-ink">{euro(marge)}</span>
                 </div>
-                <p className="mt-1 text-[11px] text-ink-3">{taux !== null ? `Taux net ${taux.toFixed(0)} %` : "—"} · CA HT − charges d&apos;exploitation.</p>
+                <p className="mt-1 text-[11px] text-ink-3">{taux !== null ? `Taux net ${pct1(taux)} %` : "—"} · CA HT − charges d&apos;exploitation.</p>
               </>
             )}
           </div>

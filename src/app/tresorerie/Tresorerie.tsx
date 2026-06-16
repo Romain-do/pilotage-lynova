@@ -11,6 +11,7 @@ import {
 import {
   euro,
   rel,
+  pct1,
   fyOf,
   fyRange,
   presetRange,
@@ -365,7 +366,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: TCatRow[]; onPick: (c: TCat
             className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className="truncate text-ink-2">{c.label}</span>
-              <span className="flex-none font-medium text-ink">{euro(c.amount)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span></span>
+              <span className="flex-none font-medium text-ink">{euro(c.amount)} <span className="font-normal text-ink-3">· {pct1(pct)} %</span></span>
             </div>
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
               <div className="h-full rounded-full bg-amber-400 transition-all duration-500" style={{ width: `${Math.max(2, (c.amount / max) * 100)}%` }} />

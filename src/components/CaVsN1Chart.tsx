@@ -1,7 +1,7 @@
 "use client";
 
 import { IconX } from "@tabler/icons-react";
-import { euro, rel, FISCAL_MONTHS } from "@/lib/facturation";
+import { euro, rel, pct1, FISCAL_MONTHS } from "@/lib/facturation";
 import { useChartSelection } from "@/components/useChartSelection";
 
 // Graphe générique « <métrique> mensuel — exercice en cours vs N-1 ». Axe fiscal oct→sept (12 mois).
@@ -93,7 +93,7 @@ function Tooltip({ index, n, label, cur, prev, fy, pinned, onClose }: { index: n
         <Row color="bg-cyan" label={`Exercice ${fy}`} value={euro(cur)} />
         <Row color="bg-ink-3/40" label={`Exercice ${fy - 1}`} value={euro(prev)} />
       </div>
-      <div className="mt-2 border-t border-line pt-1.5 text-ink-3">{d != null ? `${d >= 0 ? "+" : ""}${d.toFixed(0)} % vs N-1` : "—"}</div>
+      <div className="mt-2 border-t border-line pt-1.5 text-ink-3">{d != null ? `${d >= 0 ? "+" : ""}${pct1(d)} % vs N-1` : "—"}</div>
     </div>
   );
 }

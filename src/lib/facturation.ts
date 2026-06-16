@@ -64,6 +64,12 @@ export function euro(n: number, decimals = 0): string {
   }).format(n);
 }
 
+/** Règle unique d'affichage des POURCENTAGES & TAUX : 1 décimale partout (pas de mélange 0/1).
+ *  `n` est déjà exprimé en % (ex. 66.7 ou un delta). Pour une fraction 0..1, appeler pct1(x * 100). */
+export function pct1(n: number): string {
+  return n.toFixed(1);
+}
+
 /** Montant compact pour espaces contraints (centre de donut…) : « 282,6 k€ », « 1,2 M€ », « 950 € ».
  *  1 décimale en k€/M€ (zéro final supprimé par toLocaleString) → tient toujours dans un petit cadre. */
 export function euroCompact(n: number): string {

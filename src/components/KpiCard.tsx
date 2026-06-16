@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { IconArrowUpRight, IconArrowDownRight, IconAlertTriangle } from "@tabler/icons-react";
 import { InfoTip } from "@/components/InfoTip";
+import { pct1 } from "@/lib/facturation";
 
 // Carte KPI partagée (charte Lynova) — même gabarit que Facturation / Trésorerie.
 // `muted` grise la valeur (état « n/a »). `foot` remplace la ligne « Vs N-1 : — »
@@ -47,7 +48,7 @@ export function KpiCard({
           <span className="inline-flex items-center gap-1">
             <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${badgeClass}`}>
               {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {Math.abs(delta).toFixed(1)} {deltaUnit}
+              {pct1(Math.abs(delta))} {deltaUnit}
             </span>
             {deltaLabel && <span className="text-ink-3">{deltaLabel}</span>}
           </span>
