@@ -26,11 +26,15 @@ import { TresoAreaChart, type SeriePoint } from "@/components/TresoAreaChart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { euro } from "@/lib/facturation";
 import { prospectTitle, prospectContactName } from "@/lib/prospection";
+import type { Freshness } from "@/lib/sync-state";
 
 export interface CockpitData {
   fyLabel: string;
   fy: number;
   lastSync: string | null;
+  // Fraîcheur par source (Evoliz / Revolut) + mention « partiellement à jour » pour les composites.
+  freshness: Freshness;
+  staleNote?: string;
   leaya: number;
   leayaPrev: number;
   caFyCur: number[];
@@ -97,7 +101,7 @@ export function Cockpit({
             <h1 className="text-2xl font-semibold text-ink">Bonjour {firstName}</h1>
             <p className="mt-1 text-sm capitalize text-ink-3">{dateLabel}</p>
           </div>
-          <RefreshButton initialLastSync={data.lastSync} />
+          <RefreshButton initialLastSync={data.lastSync} freshness={data.freshness} />
         </div>
 
         {/* Actions prioritaires */}
@@ -132,7 +136,7 @@ export function Cockpit({
               value={euro(f.caHt)} delta={f.caDelta} />
             <KpiCard icon={<IconReportMoney size={18} stroke={2} />} tint="bg-violet-50 text-violet-600" label="Marge nette (approchée)"
               value={f.hasBank ? euro(f.margeNette) : "n/a"} muted={!f.hasBank}
-              delta={f.hasBank ? f.margeNetteDelta : null}
+              delta={f.hasBank ? f.margeNetteDelta : null} staleNote={data.staleNote}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
               value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
@@ -140,7 +144,7 @@ export function Cockpit({
               foot={f.hasBank ? "versée sur l'exercice (Revolut)" : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
               value={f.hasBank && f.tauxNette != null ? `${f.tauxNette.toFixed(1)} %` : "n/a"} muted={!f.hasBank}
-              delta={f.tauxNetteDeltaPts} deltaUnit="pts"
+              delta={f.tauxNetteDeltaPts} deltaUnit="pts" staleNote={data.staleNote}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${f.mrrLabel ?? "—"}`}
               value={euro(f.mrr)} delta={f.mrrDelta} />

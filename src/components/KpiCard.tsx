@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
+import { IconArrowUpRight, IconArrowDownRight, IconAlertTriangle } from "@tabler/icons-react";
 
 // Carte KPI partagée (charte Lynova) — même gabarit que Facturation / Trésorerie.
 // `muted` grise la valeur (état « n/a »). `foot` remplace la ligne « Vs N-1 : — »
@@ -9,8 +9,10 @@ import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
 // `deltaNeutral` (défaut false) : aucune polarité, badge gris neutre — pour une métrique dont la
 // variation ne porte pas de jugement (ex. rémunération : une hausse n'est ni « bonne » ni « mauvaise »).
 // La flèche reflète toujours le sens réel de variation, seule la couleur (ou son absence) juge.
+// `staleNote` (optionnel) : mention ambre sous le KPI quand une source d'un indicateur COMPOSITE
+// est périmée (ex. marge nette = Evoliz × Revolut) → ne pas présenter le chiffre comme fiable.
 export function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false,
+  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false, staleNote,
 }: {
   icon: ReactNode;
   tint: string;
@@ -23,6 +25,7 @@ export function KpiCard({
   foot?: string;
   positiveIsGood?: boolean;
   deltaNeutral?: boolean;
+  staleNote?: string;
 }) {
   const isGood = delta != null && (positiveIsGood ? delta >= 0 : delta <= 0);
   const badgeClass = deltaNeutral
@@ -49,6 +52,11 @@ export function KpiCard({
           !foot && <span className="text-ink-3">{deltaLabel} : —</span>
         )}
         {foot && <div className="text-ink-3">{foot}</div>}
+        {staleNote && (
+          <div className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+            <IconAlertTriangle size={11} stroke={2.5} /> {staleNote}
+          </div>
+        )}
       </div>
     </div>
   );

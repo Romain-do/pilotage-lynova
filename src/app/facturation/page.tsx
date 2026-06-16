@@ -2,7 +2,7 @@ import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTresorerie } from "@/lib/tresorerie-data";
 import { getEvolizInvoices, getEvolizBuys } from "@/lib/facturation-data";
-import { lastSyncAll } from "@/lib/sync-state";
+import { lastSyncAll, sourceFreshness } from "@/lib/sync-state";
 import { AppNav } from "@/components/AppNav";
 import { Facturation } from "./Facturation";
 
@@ -16,11 +16,12 @@ export default async function FacturationPage() {
 
   // Données Evoliz + Revolut mises en cache (loaders globaux, invalidés à la synchro).
   // « Dernière synchro » non cachée (lastSyncAll) → reflète toujours l'état réel.
-  const [factDocs, buysData, treso, lastSync] = await Promise.all([
+  const [factDocs, buysData, treso, lastSync, freshness] = await Promise.all([
     getEvolizInvoices(),
     getEvolizBuys(),
     getTresorerie(),
     lastSyncAll(prisma),
+    sourceFreshness(prisma),
   ]);
 
   const buys = buysData.buys;
@@ -47,6 +48,7 @@ export default async function FacturationPage() {
           outflows={treso.outflows}
           todayISO={todayISO}
           lastSync={lastSync}
+          freshness={freshness}
         />
       )}
     </main>
