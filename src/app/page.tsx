@@ -78,6 +78,7 @@ async function buildCockpitData(): Promise<CockpitData> {
   const prevRange = shiftYear(range);
   const cur = computeRange(docs, buys, range, "all");
   const prev = computeRange(docs, buys, prevRange, "all");
+  const nMonths = Math.max(1, cur.months.length); // nb de mois de l'exercice à date (pour les ⌀/mois)
 
   const bankStart = earliestOutflowDate(treso.outflows);
   const hasBank = bankStart != null && range.end >= bankStart;
@@ -185,10 +186,12 @@ async function buildCockpitData(): Promise<CockpitData> {
     bankStart,
     finance: {
       caHt: cur.caHtTotal,
+      caHtAvg: cur.caHtTotal / nMonths,
       caDelta: rel(cur.caHtTotal, prev.caHtTotal),
       margeNette,
       margeNetteDelta: hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null,
       remu,
+      remuAvg: remu / nMonths,
       remuDelta: hasBank && hasBankPrev ? rel(remu, remuPrev) : null,
       hasBank,
       tauxNette,

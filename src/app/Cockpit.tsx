@@ -47,9 +47,9 @@ export interface CockpitData {
   caVsCharges: ChargeSeries;
   bankStart: string | null;
   finance: {
-    caHt: number; caDelta: number | null;
+    caHt: number; caHtAvg: number; caDelta: number | null;
     margeNette: number; margeNetteDelta: number | null; hasBank: boolean;
-    remu: number; remuDelta: number | null;
+    remu: number; remuAvg: number; remuDelta: number | null;
     tauxNette: number | null; tauxNetteDeltaPts: number | null;
     mrr: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
@@ -138,26 +138,27 @@ export function Cockpit({
             <span className="text-xs text-ink-3">{data.fyLabel} · comparé à N-1</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {/* Essentiels en tête : CA HT · Marge nette · Trésorerie · Cash net */}
             <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA HT"
-              value={euro(f.caHt)} delta={f.caDelta} />
+              value={euro(f.caHt)} delta={f.caDelta} foot={`⌀ ${euro(f.caHtAvg)}/mois`} />
             <KpiCard icon={<IconReportMoney size={18} stroke={2} />} tint="bg-violet-50 text-violet-600" label="Marge nette (approchée)"
               value={f.hasBank ? euro(f.margeNette) : "n/a"} muted={!f.hasBank}
               delta={f.hasBank ? f.margeNetteDelta : null} staleNote={data.staleNote}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
+            <KpiCard icon={<IconWallet size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Trésorerie totale"
+              value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`} />
+            <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · ${f.monthLabel}`}
+              value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta} />
             <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
               value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
               delta={f.hasBank ? f.remuDelta : null} deltaNeutral
-              foot={f.hasBank ? "versée sur l'exercice (Revolut)" : "pas de données bancaires avant nov. 2024"} />
+              foot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
               value={f.hasBank && f.tauxNette != null ? `${f.tauxNette.toFixed(1)} %` : "n/a"} muted={!f.hasBank}
               delta={f.tauxNetteDeltaPts} deltaUnit="pts" staleNote={data.staleNote}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${f.mrrLabel ?? "—"}`}
               value={euro(f.mrr)} delta={f.mrrDelta} />
-            <KpiCard icon={<IconWallet size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Trésorerie totale"
-              value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`} />
-            <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · ${f.monthLabel}`}
-              value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta} />
             <LeayaCard ttc={data.leaya} ttcPrev={data.leayaPrev} />
           </div>
         </div>
