@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { IconX } from "@tabler/icons-react";
 import { euro } from "@/lib/facturation";
+import { useChartSelection } from "@/components/useChartSelection";
 
 // Graphe « Évolution de la trésorerie » (aire lissée du solde EUR fin de mois).
 // Extrait de la vue Trésorerie pour être réutilisé tel quel au Cockpit (pas de duplication).
@@ -45,7 +46,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 }
 
 export function TresoAreaChart({ series }: { series: SeriePoint[] }) {
-  const [hover, setHover] = useState<number | null>(null);
+  const { active: sel, pinned, handlers, leave, close } = useChartSelection();
   const n = series.length;
   if (n === 0) return <p className="mt-6 text-center text-sm text-ink-3">Aucune donnée sur la période.</p>;
 
@@ -63,11 +64,11 @@ export function TresoAreaChart({ series }: { series: SeriePoint[] }) {
   const ticks = [0, 1 / 3, 2 / 3, 1].map((t) => niceMax * t);
   const last = pts[n - 1];
   const lastVal = series[n - 1].endBalance;
-  const sel = hover ?? n - 1;
+  const axisSel = sel ?? n - 1;
   const ariaLabel = `Évolution de la trésorerie sur ${n} mois : de ${euro(series[0].endBalance)} (${series[0].label}) à ${euro(lastVal)} (${series[n - 1].label}).`;
 
   return (
-    <div className="relative mt-3 select-none" onMouseLeave={() => setHover(null)} role="img" aria-label={ariaLabel}>
+    <div className="relative mt-3 select-none" onMouseLeave={leave} role="group" aria-label={ariaLabel}>
       <div className="relative h-44 pl-12">
         {/* Repères d'axe Y (libellés HTML, nets) */}
         {ticks.map((t, i) => (
@@ -94,15 +95,22 @@ export function TresoAreaChart({ series }: { series: SeriePoint[] }) {
           {/* Marqueur dernier point (sans étiquette flottante : la valeur reste lisible au survol) */}
           <span className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-cyan-600 shadow"
             style={{ left: `${last.x}%`, top: `${last.y}%` }} />
-          {/* Marqueur survol */}
-          {hover !== null && hover !== n - 1 && (
+          {/* Marqueur sélection */}
+          {sel !== null && sel !== n - 1 && (
             <span className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-600"
-              style={{ left: `${pts[hover].x}%`, top: `${pts[hover].y}%` }} />
+              style={{ left: `${pts[sel].x}%`, top: `${pts[sel].y}%` }} />
           )}
-          {/* Colonnes de survol */}
+          {/* Colonnes interactives (souris + focus clavier + tap) */}
           <div className="absolute inset-0 flex">
             {series.map((s, i) => (
-              <div key={s.key} className="h-full flex-1" onMouseEnter={() => setHover(i)} />
+              <button
+                key={s.key}
+                type="button"
+                {...handlers(i)}
+                aria-label={`${s.label} : solde fin de mois ${euro(s.endBalance)}.`}
+                aria-pressed={pinned === i}
+                className="h-full flex-1 cursor-pointer rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-inset"
+              />
             ))}
           </div>
         </div>
@@ -111,16 +119,22 @@ export function TresoAreaChart({ series }: { series: SeriePoint[] }) {
       <div className="flex pl-12">
         {series.map((s, i) => (
           <div key={s.key} className="flex-1 text-center">
-            {(n <= 14 || i % 2 === 0) && <span className={`text-[9px] ${sel === i ? "font-semibold text-ink" : "text-ink-3"}`}>{s.label}</span>}
+            {(n <= 14 || i % 2 === 0) && <span className={`text-[9px] ${axisSel === i ? "font-semibold text-ink" : "text-ink-3"}`}>{s.label}</span>}
           </div>
         ))}
       </div>
       {/* Tooltip */}
-      {hover !== null && (
-        <div className="pointer-events-none absolute top-0 z-10 w-40 -translate-x-1/2 rounded-card border border-line bg-white p-2.5 text-xs shadow-card-hover"
-          style={{ left: `calc(48px + (100% - 48px) * ${(xOf(hover) / 100).toFixed(4)})`, ...(hover > n * 0.66 ? { transform: "translateX(-90%)" } : {}) }}>
-          <div className="font-semibold text-ink">{series[hover].label}</div>
-          <div className="mt-1.5"><Line label="Solde fin" value={euro(series[hover].endBalance)} strong /></div>
+      {sel !== null && (
+        <div className={`absolute top-0 z-10 w-40 -translate-x-1/2 rounded-card border border-line bg-white p-2.5 text-xs shadow-card-hover ${pinned ? "pointer-events-auto" : "pointer-events-none"}`}
+          style={{ left: `calc(48px + (100% - 48px) * ${(xOf(sel) / 100).toFixed(4)})`, ...(sel > n * 0.66 ? { transform: "translateX(-90%)" } : {}) }}>
+          {pinned && (
+            <button type="button" onClick={close} aria-label="Fermer le détail"
+              className="absolute right-1.5 top-1.5 rounded p-0.5 text-ink-3 hover:bg-cloud hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
+              <IconX size={13} />
+            </button>
+          )}
+          <div className="pr-4 font-semibold text-ink">{series[sel].label}</div>
+          <div className="mt-1.5"><Line label="Solde fin" value={euro(series[sel].endBalance)} strong /></div>
         </div>
       )}
     </div>

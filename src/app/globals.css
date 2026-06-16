@@ -16,7 +16,7 @@
   /* Texte */
   --color-ink: #0a1733; /* titres */
   --color-ink-2: #43506b; /* secondaire */
-  --color-ink-3: #8893a8; /* tertiaire */
+  --color-ink-3: #5e6a82; /* tertiaire — assombri pour WCAG AA (~5:1 sur blanc, ~4,7:1 sur cloud) */
 
   --color-background: #f6f8fb;
   --color-foreground: #0a1733;

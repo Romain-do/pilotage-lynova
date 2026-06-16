@@ -4,8 +4,13 @@ import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
 // Carte KPI partagée (charte Lynova) — même gabarit que Facturation / Trésorerie.
 // `muted` grise la valeur (état « n/a »). `foot` remplace la ligne « Vs N-1 : — »
 // quand aucun delta n'est fourni (ex. mention de garde-fou).
+// `positiveIsGood` (défaut true) : sens métier du delta. Pour un KPI de COÛT « franc » (achats…),
+// passer `false` → la couleur s'inverse (une hausse = rouge, une baisse = vert).
+// `deltaNeutral` (défaut false) : aucune polarité, badge gris neutre — pour une métrique dont la
+// variation ne porte pas de jugement (ex. rémunération : une hausse n'est ni « bonne » ni « mauvaise »).
+// La flèche reflète toujours le sens réel de variation, seule la couleur (ou son absence) juge.
 export function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot,
+  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false,
 }: {
   icon: ReactNode;
   tint: string;
@@ -16,7 +21,13 @@ export function KpiCard({
   deltaLabel?: string;
   muted?: boolean;
   foot?: string;
+  positiveIsGood?: boolean;
+  deltaNeutral?: boolean;
 }) {
+  const isGood = delta != null && (positiveIsGood ? delta >= 0 : delta <= 0);
+  const badgeClass = deltaNeutral
+    ? "bg-cloud text-ink-2"
+    : isGood ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700";
   return (
     <div className="group rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex items-center gap-2">
@@ -27,7 +38,7 @@ export function KpiCard({
       <div className="mt-1.5 min-h-4 space-y-1 text-xs">
         {delta != null ? (
           <span className="inline-flex items-center gap-1">
-            <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+            <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${badgeClass}`}>
               {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
               {Math.abs(delta).toFixed(1)} {deltaUnit}
             </span>

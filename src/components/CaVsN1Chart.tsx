@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { IconX } from "@tabler/icons-react";
 import { euro, rel, FISCAL_MONTHS } from "@/lib/facturation";
+import { useChartSelection } from "@/components/useChartSelection";
 
 // Graphe générique « <métrique> mensuel — exercice en cours vs N-1 ». Axe fiscal oct→sept (12 mois).
 // Barres : exercice = cyan, N-1 = gris. Tooltip mois + valeur exercice + valeur N-1 + écart.
@@ -17,60 +18,77 @@ export function CaVsN1Chart({
   fy: number;
   unitLabel?: string;
 }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(1, ...current, ...previous);
+  const { active: sel, pinned, handlers, leave, close } = useChartSelection();
+  // Valeur d'un mois, bornée à 0 si le tableau est plus court que 12 / contient un trou (anti-NaN).
+  const at = (a: number[], i: number) => a[i] ?? 0;
+  const max = Math.max(1, ...current.map((v) => v || 0), ...previous.map((v) => v || 0));
   const n = FISCAL_MONTHS.length;
   const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
 
   return (
     <div
       className="relative mt-3"
-      onMouseLeave={() => setHover(null)}
-      role="img"
+      onMouseLeave={leave}
+      role="group"
       aria-label={`${unitLabel} mensuel, exercice ${fy} (${euro(sum(current))}) vs exercice ${fy - 1} (${euro(sum(previous))}), axe octobre à septembre.`}
     >
       <div className="flex h-44 items-end gap-1 sm:gap-1.5">
         {FISCAL_MONTHS.map((label, i) => {
-          const active = hover === null || hover === i;
+          const active = sel === null || sel === i;
           return (
-            <div
+            <button
               key={label}
-              className="relative flex h-full flex-1 cursor-default flex-col items-center justify-end"
-              onMouseEnter={() => setHover(i)}
+              type="button"
+              {...handlers(i)}
+              aria-label={`${label} : exercice ${fy} ${euro(at(current, i))}, exercice ${fy - 1} ${euro(at(previous, i))}.`}
+              aria-pressed={pinned === i}
+              className="relative flex h-full flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
             >
-              <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${hover === i ? "bg-cyan/[0.07]" : ""}`} />
+              <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${sel === i ? "bg-cyan/[0.07]" : ""}`} />
               <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-5">
                 <div
                   className={`w-2.5 origin-bottom rounded-t-sm bg-cyan transition-opacity duration-200 sm:w-3 ${active ? "opacity-100" : "opacity-40"}`}
-                  style={{ height: `${Math.min(100, (current[i] / max) * 100)}%` }}
+                  style={{ height: `${Math.min(100, (at(current, i) / max) * 100)}%` }}
                 />
                 <div
                   className={`w-2.5 origin-bottom rounded-t-sm bg-ink-3/40 transition-opacity duration-200 sm:w-3 ${active ? "opacity-100" : "opacity-40"}`}
-                  style={{ height: `${Math.min(100, (previous[i] / max) * 100)}%` }}
+                  style={{ height: `${Math.min(100, (at(previous, i) / max) * 100)}%` }}
                 />
               </div>
               {(n <= 14 || i % 2 === 0) && (
-                <span className={`absolute bottom-0 truncate text-[9px] transition-colors ${hover === i ? "font-semibold text-ink" : "text-ink-3"}`}>{label}</span>
+                <span className={`absolute bottom-0 truncate text-[9px] transition-colors ${sel === i ? "font-semibold text-ink" : "text-ink-3"}`}>{label}</span>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
-      {hover !== null && <Tooltip index={hover} n={n} label={FISCAL_MONTHS[hover]} cur={current[hover]} prev={previous[hover]} fy={fy} />}
+      {sel !== null && (
+        <Tooltip index={sel} n={n} label={FISCAL_MONTHS[sel]} cur={at(current, sel)} prev={at(previous, sel)} fy={fy} pinned={pinned === sel} onClose={close} />
+      )}
     </div>
   );
 }
 
-function Tooltip({ index, n, label, cur, prev, fy }: { index: number; n: number; label: string; cur: number; prev: number; fy: number }) {
+function Tooltip({ index, n, label, cur, prev, fy, pinned, onClose }: { index: number; n: number; label: string; cur: number; prev: number; fy: number; pinned?: boolean; onClose?: () => void }) {
   const left = ((index + 0.5) / n) * 100;
   const alignRight = index > n * 0.66;
   const d = rel(cur, prev);
   return (
     <div
-      className="pointer-events-none absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover"
+      className={`absolute top-0 z-10 w-44 -translate-x-1/2 rounded-card border border-line bg-white p-3 text-xs shadow-card-hover ${pinned ? "pointer-events-auto" : "pointer-events-none"}`}
       style={{ left: `${left}%`, ...(alignRight ? { transform: "translateX(-85%)" } : {}) }}
     >
-      <div className="font-semibold text-ink">{label}</div>
+      {pinned && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer le détail"
+          className="absolute right-1.5 top-1.5 rounded p-0.5 text-ink-3 hover:bg-cloud hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+        >
+          <IconX size={13} />
+        </button>
+      )}
+      <div className="pr-4 font-semibold text-ink">{label}</div>
       <div className="mt-2 space-y-1">
         <Row color="bg-cyan" label={`Exercice ${fy}`} value={euro(cur)} />
         <Row color="bg-ink-3/40" label={`Exercice ${fy - 1}`} value={euro(prev)} />
