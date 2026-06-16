@@ -64,6 +64,15 @@ export function euro(n: number, decimals = 0): string {
   }).format(n);
 }
 
+/** Montant compact pour espaces contraints (centre de donut…) : « 282,6 k€ », « 1,2 M€ », « 950 € ».
+ *  1 décimale en k€/M€ (zéro final supprimé par toLocaleString) → tient toujours dans un petit cadre. */
+export function euroCompact(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return `${(n / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M€`;
+  if (a >= 1_000) return `${(n / 1_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k€`;
+  return `${Math.round(n)} €`;
+}
+
 /** Arrondit `values` (≥ 0) à l'euro en GARANTISSANT que leur somme vaut `Math.round(target)`
  *  (méthode du plus fort reste). Sert aux tooltips de ventilation : les lignes affichées « tombent
  *  juste » (Σ parts == total affiché), au lieu d'arrondir chaque ligne indépendamment. */

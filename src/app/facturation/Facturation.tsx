@@ -17,6 +17,7 @@ import {
 } from "@tabler/icons-react";
 import {
   euro,
+  euroCompact,
   apportionEuros,
   formatDateFR,
   computeRange,
@@ -479,11 +480,11 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
   const r = 48;
   const c = 2 * Math.PI * r;
   const aboLen = aboPct * c;
-
-  const center =
-    hover === "abo" ? { l: "Abonnements", v: euro(stats.aboHt), p: aboPct }
-    : hover === "install" ? { l: "Installations", v: euro(stats.installHt), p: 1 - aboPct }
-    : { l: "CA HT", v: euro(stats.caHtTotal), p: null as number | null };
+  // Segment survolé : son détail va dans le tooltip externe + la légende — JAMAIS au centre.
+  const seg =
+    hover === "abo" ? { label: "Abonnements", value: stats.aboHt, pct: aboPct }
+    : hover === "install" ? { label: "Installations", value: stats.installHt, pct: 1 - aboPct }
+    : null;
 
   return (
     <div className="rounded-card border border-line bg-white p-4 shadow-card">
@@ -495,21 +496,31 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
             <title>Répartition du CA HT (abonnements / installations) et achats / marge</title>
             <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-line)" strokeWidth="14" />
             <circle cx="64" cy="64" r={r} fill="none" className="text-cyan transition-[stroke-width] duration-200" stroke="currentColor"
-              strokeWidth={hover === "abo" ? 18 : 14} strokeDasharray={`${aboLen} ${c - aboLen}`}
+              strokeWidth={hover === "abo" ? 17 : 14} strokeDasharray={`${aboLen} ${c - aboLen}`}
               onMouseEnter={() => setHover("abo")} onMouseLeave={() => setHover(null)} />
             <circle cx="64" cy="64" r={r} fill="none" className="text-navy transition-[stroke-width] duration-200" stroke="currentColor"
-              strokeWidth={hover === "install" ? 18 : 14} strokeDasharray={`${c - aboLen} ${aboLen}`} strokeDashoffset={-aboLen}
+              strokeWidth={hover === "install" ? 17 : 14} strokeDasharray={`${c - aboLen} ${aboLen}`} strokeDashoffset={-aboLen}
               onMouseEnter={() => setHover("install")} onMouseLeave={() => setHover(null)} />
           </svg>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-[9px] uppercase tracking-wide text-ink-3">{center.l}</span>
-            <span className="text-sm font-semibold text-ink">{center.v}</span>
-            {center.p !== null && <span className="text-[10px] text-ink-3">{(center.p * 100).toFixed(0)} %</span>}
+          {/* Centre FIXE : « CA HT » + total en format compact. Ne change jamais (ni au survol) →
+              ne peut pas déborder du trou. Format compact + tabular-nums = toujours contenu. */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
+            <span className="text-[9px] uppercase tracking-wide text-ink-3">CA HT</span>
+            <span className="text-sm font-semibold tabular-nums leading-tight text-ink">{euroCompact(stats.caHtTotal)}</span>
           </div>
+          {/* Tooltip court à côté du donut (au-dessus) — segment survolé, jamais au centre. */}
+          {seg && (
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-card border border-line bg-white px-2 py-1 text-xs shadow-card-hover">
+              <span className="font-medium text-ink">{seg.label}</span>
+              <span className="text-ink-2"> · {euro(seg.value)} · {Math.round(seg.pct * 100)} %</span>
+            </div>
+          )}
         </div>
         <div className="w-full min-w-0 flex-1 space-y-2 text-sm">
-          <LegRow color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} pct={aboPct} />
-          <LegRow color="bg-navy" label="Installations" value={euro(stats.installHt)} pct={1 - aboPct} />
+          <LegButton color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} pct={aboPct}
+            active={hover === "abo"} onHover={(v) => setHover(v ? "abo" : null)} />
+          <LegButton color="bg-navy" label="Installations" value={euro(stats.installHt)} pct={1 - aboPct}
+            active={hover === "install"} onHover={(v) => setHover(v ? "install" : null)} />
           <div className="flex items-center gap-2 border-t border-line pt-2">
             <span className="h-2.5 w-2.5 flex-none rounded-full bg-transparent" />
             <span className="font-medium text-ink">CA HT total</span>
@@ -522,6 +533,29 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
         </div>
       </div>
     </div>
+  );
+}
+
+// Ligne de légende INTERACTIVE (Abonnements / Installations) : survol/focus → met en avant le
+// segment du donut (état `hover` remonté) et se surligne. Accessible clavier (button + focus ring).
+function LegButton({ color, label, value, pct, active, onHover }: {
+  color: string; label: string; value: string; pct: number; active: boolean; onHover: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      onFocus={() => onHover(true)}
+      onBlur={() => onHover(false)}
+      aria-label={`${label} : ${value}, ${Math.round(pct * 100)} %`}
+      className={`flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan ${active ? "bg-cyan/[0.08]" : "hover:bg-cloud"}`}
+    >
+      <span className={`h-2.5 w-2.5 flex-none rounded-full ${color}`} />
+      <span className={`min-w-0 truncate ${active ? "font-medium text-ink" : "text-ink-2"}`}>{label}</span>
+      <span className="flex-none text-xs text-ink-3">{(pct * 100).toFixed(0)} %</span>
+      <span className="ml-auto flex-none tabular-nums font-medium text-ink">{value}</span>
+    </button>
   );
 }
 
