@@ -18,6 +18,7 @@ import {
 import {
   euro,
   euroCompact,
+  pct1,
   apportionEuros,
   formatDateFR,
   computeRange,
@@ -174,7 +175,7 @@ export function Facturation({
           icon={<IconPercentage size={18} stroke={2} />}
           tint="bg-amber-50 text-amber-600"
           label="Taux de marge nette"
-          value={hasBank && tauxNette != null ? `${tauxNette.toFixed(1)} %` : "n/a"}
+          value={hasBank && tauxNette != null ? `${pct1(tauxNette)} %` : "n/a"}
           muted={!hasBank}
           delta={tauxNetteDeltaPts}
           deltaUnit="pts"
@@ -403,7 +404,7 @@ function MargeNetteCard({
               <span className="inline-flex items-center gap-1">
                 <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
                   {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-                  {Math.abs(delta).toFixed(1)} %
+                  {pct1(Math.abs(delta))} %
                 </span>
                 <span className="text-ink-3">Vs N-1</span>
               </span>
@@ -492,7 +493,7 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
       <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
         <div className="relative h-28 w-28 flex-none">
           <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90" role="img"
-            aria-label={`Répartition du CA HT : ${euro(stats.caHtTotal)} au total — abonnements ${euro(stats.aboHt)} (${Math.round(aboPct * 100)} %), installations ${euro(stats.installHt)} (${Math.round((1 - aboPct) * 100)} %). Achats ${euro(stats.achatsHt)}, marge ${euro(stats.marge)}.`}>
+            aria-label={`Répartition du CA HT : ${euro(stats.caHtTotal)} au total — abonnements ${euro(stats.aboHt)} (${pct1(aboPct * 100)} %), installations ${euro(stats.installHt)} (${pct1((1 - aboPct) * 100)} %). Achats ${euro(stats.achatsHt)}, marge ${euro(stats.marge)}.`}>
             <title>Répartition du CA HT (abonnements / installations) et achats / marge</title>
             <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-line)" strokeWidth="14" />
             <circle cx="64" cy="64" r={r} fill="none" className="text-cyan transition-[stroke-width] duration-200" stroke="currentColor"
@@ -512,7 +513,7 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
           {seg && (
             <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-card border border-line bg-white px-2 py-1 text-xs shadow-card-hover">
               <span className="font-medium text-ink">{seg.label}</span>
-              <span className="text-ink-2"> · {euro(seg.value)} · {Math.round(seg.pct * 100)} %</span>
+              <span className="text-ink-2"> · {euro(seg.value)} · {pct1(seg.pct * 100)} %</span>
             </div>
           )}
         </div>
@@ -548,12 +549,12 @@ function LegButton({ color, label, value, pct, active, onHover }: {
       onMouseLeave={() => onHover(false)}
       onFocus={() => onHover(true)}
       onBlur={() => onHover(false)}
-      aria-label={`${label} : ${value}, ${Math.round(pct * 100)} %`}
+      aria-label={`${label} : ${value}, ${pct1(pct * 100)} %`}
       className={`flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan ${active ? "bg-cyan/[0.08]" : "hover:bg-cloud"}`}
     >
       <span className={`h-2.5 w-2.5 flex-none rounded-full ${color}`} />
       <span className={`min-w-0 truncate ${active ? "font-medium text-ink" : "text-ink-2"}`}>{label}</span>
-      <span className="flex-none text-xs text-ink-3">{(pct * 100).toFixed(0)} %</span>
+      <span className="flex-none text-xs text-ink-3">{pct1(pct * 100)} %</span>
       <span className="ml-auto flex-none tabular-nums font-medium text-ink">{value}</span>
     </button>
   );
@@ -564,7 +565,7 @@ function LegRow({ color, label, value, strong, pct }: { color: string; label: st
     <div className="flex items-center gap-2">
       <span className={`h-2.5 w-2.5 flex-none rounded-full ${color}`} />
       <span className="min-w-0 truncate text-ink-2">{label}</span>
-      {pct != null && <span className="flex-none text-xs text-ink-3">{(pct * 100).toFixed(0)} %</span>}
+      {pct != null && <span className="flex-none text-xs text-ink-3">{pct1(pct * 100)} %</span>}
       <span className={`ml-auto flex-none tabular-nums ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
     </div>
   );
@@ -625,7 +626,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: CatRow[]; onPick: (c: CatRo
             className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
             <div className="flex items-baseline justify-between gap-2 text-xs">
               <span className={`truncate ${isSans ? "italic text-ink-3" : "text-ink-2"}`}>{c.label}</span>
-              <span className="flex-none font-medium text-ink">{euro(c.ht)} <span className="font-normal text-ink-3">· {pct.toFixed(0)} %</span></span>
+              <span className="flex-none font-medium text-ink">{euro(c.ht)} <span className="font-normal text-ink-3">· {pct1(pct)} %</span></span>
             </div>
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
               <div className={`h-full rounded-full transition-all duration-500 ${isSans ? "bg-navy/30" : "bg-amber-400"}`} style={{ width: `${Math.max(2, (c.ht / max) * 100)}%` }} />

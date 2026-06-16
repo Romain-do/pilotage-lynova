@@ -25,7 +25,7 @@ import { CaVsChargesChart, ChargesLegend, type ChargeSeries } from "@/components
 import { TresoAreaChart, type SeriePoint } from "@/components/TresoAreaChart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { InfoTip } from "@/components/InfoTip";
-import { euro } from "@/lib/facturation";
+import { euro, pct1 } from "@/lib/facturation";
 import { prospectTitle, prospectContactName } from "@/lib/prospection";
 import type { Freshness } from "@/lib/sync-state";
 
@@ -155,7 +155,7 @@ export function Cockpit({
               delta={f.hasBank ? f.remuDelta : null} deltaNeutral
               foot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
-              value={f.hasBank && f.tauxNette != null ? `${f.tauxNette.toFixed(1)} %` : "n/a"} muted={!f.hasBank}
+              value={f.hasBank && f.tauxNette != null ? `${pct1(f.tauxNette)} %` : "n/a"} muted={!f.hasBank}
               delta={f.tauxNetteDeltaPts} deltaUnit="pts" staleNote={data.staleNote}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
             <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${f.mrrLabel ?? "—"}`}
@@ -213,7 +213,7 @@ export function Cockpit({
               <KpiCard icon={<IconUsers size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Clients actuels"
                 value={String(p.clientsActuels)} foot={`${p.totalProspects} prospect(s) au total`} />
               <KpiCard icon={<IconTrophy size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Taux de réussite"
-                value={`${p.tauxReussite} %`} foot="clients ÷ (clients + refus)" />
+                value={`${pct1(p.tauxReussite)} %`} foot="clients ÷ (clients + refus)" />
               <KpiCard icon={<IconCalendarEvent size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="À rencontrer"
                 value={String(p.aRencontrer)} foot="rendez-vous à planifier" />
               <KpiCard icon={<IconPhoneCall size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="À recontacter"

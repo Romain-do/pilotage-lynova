@@ -1,5 +1,5 @@
 import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
-import { euro, rel } from "@/lib/facturation";
+import { euro, rel, pct1 } from "@/lib/facturation";
 
 // Carte « Versé à Leaya » (style maison Leaya, tokens @theme). Partagée Cockpit + Trésorerie.
 // ttc = total versé sur la période ; HT = ttc / 1,2 (TVA 20 %). Badge Vs N-1 si pertinent.
@@ -21,7 +21,7 @@ export function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
           <span className="inline-flex items-center gap-1">
             <span className="inline-flex items-center gap-0.5 rounded-full bg-leaya-badge px-1.5 py-0.5 font-semibold text-leaya-ink">
               {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {Math.abs(delta).toFixed(1)} %
+              {pct1(Math.abs(delta))} %
             </span>
             <span className="text-ink-3">Vs N-1</span>
           </span>

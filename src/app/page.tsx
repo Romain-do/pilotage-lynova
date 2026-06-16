@@ -13,6 +13,7 @@ import {
   presetRange,
   rel,
   euro,
+  pct1,
   caHtByFiscalMonth,
 } from "@/lib/facturation";
 import { getTresorerie } from "@/lib/tresorerie-data";
@@ -133,8 +134,9 @@ async function buildCockpitData(): Promise<CockpitData> {
     if (c) counts[c] += 1;
   }
   const clientsActuels = counts.a_installer + counts.installes;
+  // Taux brut (non arrondi) → affiché à 1 décimale comme tous les pourcentages (règle pct1).
   const tauxReussite =
-    clientsActuels + counts.refus > 0 ? Math.round((clientsActuels / (clientsActuels + counts.refus)) * 100) : 0;
+    clientsActuels + counts.refus > 0 ? (clientsActuels / (clientsActuels + counts.refus)) * 100 : 0;
 
   const now = Date.now();
   const overdue = rows
@@ -161,7 +163,7 @@ async function buildCockpitData(): Promise<CockpitData> {
   if (cashNetMonth < 0) alerts.push({ tone: "danger", text: `Cash net négatif ce mois (${euro(cashNetMonth)})`, href: "/tresorerie" });
   if (overdue.length > 0) alerts.push({ tone: "warn", text: `${overdue.length} prospect${overdue.length > 1 ? "s" : ""} à recontacter (rappel échu)`, href: "/prospection" });
   if (unpaidTtc >= 1) alerts.push({ tone: "warn", text: `${euro(unpaidTtc)} de factures impayées (restant dû)`, href: "/facturation" });
-  if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${mrr.pct.toFixed(0)} %)`, href: "/facturation" });
+  if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${pct1(mrr.pct)} %)`, href: "/facturation" });
   if (counts.a_rencontrer > 0) alerts.push({ tone: "info", text: `${counts.a_rencontrer} prospect${counts.a_rencontrer > 1 ? "s" : ""} à rencontrer`, href: "/prospection" });
 
   // Aucune donnée d'aucune source (cache vide, avant toute synchro) → état vide dédié au Cockpit,
