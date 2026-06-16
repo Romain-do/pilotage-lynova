@@ -60,6 +60,7 @@ export async function sendPresentationEmail(prospectId: string): Promise<MailAct
 
 const PDF_PUBLIC_PATH = "/presentation-lynova.pdf";
 const PDF_ATTACHMENT_NAME = "presentation-lynova.pdf";
+const RDV_TEST_RECIPIENT = "romain@lynova.net"; // destinataire en mode test (RDV_SYNTHESIS_LIVE ≠ true)
 
 /** Récupère la présentation PDF (public/ non garanti en serverless → fetch de l'URL publique) et
  *  l'encode en base64 pour une pièce jointe Graph « inline ». */
@@ -107,7 +108,7 @@ export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailAct
   // ⚠️ SÉCURITÉ TEST : par défaut l'envoi est REDIRIGÉ vers romain@lynova.net (jamais un vrai
   // prospect). Pour activer l'envoi réel en production, poser la variable d'env RDV_SYNTHESIS_LIVE=true.
   const live = process.env.RDV_SYNTHESIS_LIVE === "true";
-  const recipient = live ? to : "romain@lynova.net";
+  const recipient = live ? to : RDV_TEST_RECIPIENT;
 
   const { subject, html } = rdvSynthesisEmail(prospect);
 
@@ -119,8 +120,16 @@ export async function sendRdvSynthesisEmail(prospectId: string): Promise<MailAct
       cc: [RDV_SYNTHESIS_CC],
       attachments: [{ name: PDF_ATTACHMENT_NAME, contentType: "application/pdf", contentBytes: pdf.contentBytes }],
     });
-    const mode = live ? "" : ` · MODE TEST (destinataire réel « ${to} » ignoré)`;
-    return { ok: true, message: `Synthèse RDV envoyée à ${recipient} (CC ${RDV_SYNTHESIS_CC})${mode}.` };
+    if (live) {
+      const who = prospect.company?.trim() || to;
+      return { ok: true, message: `Synthèse RDV envoyée à ${who} (CC ${RDV_SYNTHESIS_CC}).` };
+    }
+    // Mode test : on précise le prospect réel UNIQUEMENT s'il diffère de ton adresse (sinon redondant).
+    const realNote = to.toLowerCase() !== RDV_TEST_RECIPIENT ? ` (prospect réel : ${to}, non contacté)` : "";
+    return {
+      ok: true,
+      message: `Mode test — e-mail envoyé à toi (${RDV_TEST_RECIPIENT}), le prospect ne reçoit rien${realNote}.`,
+    };
   } catch (e) {
     if (e instanceof GraphError) {
       console.error("[msgraph] sendRdvSynthesisEmail:", e.status, e.message);
