@@ -5,6 +5,7 @@
 
 export const PRESENTATION_CC = "meganne@leaya.fr";
 export const MEETING_NOTIFY_TO = "support@lynova.net";
+export const RDV_SYNTHESIS_CC = "support@lynova.net";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/romain-ioli/";
 
@@ -75,6 +76,13 @@ function p(html: string): string {
   return `<p style="margin:0 0 14px;">${html}</p>`;
 }
 
+/** Liste à puces stylée inline (clients mail). `items` = HTML déjà construit (statique, non échappé). */
+function ul(items: string[]): string {
+  return `<ul style="margin:0 0 14px;padding-left:20px;">${items
+    .map((i) => `<li style="margin:0 0 8px;">${i}</li>`)
+    .join("")}</ul>`;
+}
+
 // ───────────────────────── E-mail de présentation (E) ─────────────────────────
 
 export interface PresentationEmail {
@@ -104,6 +112,43 @@ export function presentationEmail(prospect: Pick<ProspectContact, "genre" | "nom
     SIGNATURE_HTML;
 
   return { subject: "Présentation de Lynova à votre demande", html: wrap(body) };
+}
+
+// ───────────────────────── E-mail de synthèse RDV (C) ─────────────────────────
+// Récapitulatif envoyé au prospect APRÈS la démonstration (DIRIGEANT only). Même gabarit/structure
+// que la présentation, même signature Romain. La présentation PDF est jointe à l'envoi (server action).
+
+export function rdvSynthesisEmail(prospect: Pick<ProspectContact, "genre" | "nom" | "prenom" | "company">): PresentationEmail {
+  const company = prospect.company?.trim();
+  const subject = company ? `Lynova x ${company} : Suite à notre rendez-vous` : "Lynova : Suite à notre rendez-vous";
+  const body =
+    p(escapeHtml(salutation(prospect))) +
+    p("Merci pour votre temps, c'était un vrai plaisir d'échanger avec vous.") +
+    p(
+      'Comme convenu, je vous joins toute la présentation concernant la société. Voici notre site internet : <a href="https://www.lynova.net" style="color:#0b7c9e;">www.lynova.net</a>'
+    ) +
+    p(
+      "1. Vous trouverez le récapitulatif de la valeur ajoutée de chaque module présenté et les captures d'écran de notre outil en pièce jointe."
+    ) +
+    p("2. Récapitulatif des prix :") +
+    ul([
+      "<strong>Développement sur mesure (frais fixes)</strong> : 2 000 € HT / module (chaque module = une page d'analyses personnalisée incluant développement, automatisation et mise à jour des données).",
+      "<strong>Frais d'utilisation mensuels</strong> : accès plateforme + maintenance 405 € HT / mois (1 actualisation quotidienne).",
+      "<strong>Comptes utilisateurs</strong> : Dirigeant 45 € HT / mois / compte (accès complet) · Employé 30 € HT / mois / compte (accès restreint).",
+    ]) +
+    p(
+      "Depuis bientôt 6 ans, Lynova accompagne ses clients avec des résultats concrets : meilleure rentabilité, croissance du CA, réduction du risque crédit/client, gestion simplifiée. +80 clients actifs, aucun départ depuis la création. Service sans engagement, outil rentabilisé dans la grande majorité des cas en moins de 4 mois."
+    ) +
+    p(
+      "Références clients joignables pour un retour d'expérience : Schneider, Paris Select, G Rungis, Lomme Primeurs, Tombarel, Goostar France, Vinas, Neta, Capexo, Laparra, Agruban, Mouneyrac, SMB, Paris Herbes, France Food, JH…"
+    ) +
+    p(
+      "Livraison de votre outil sous 10 jours à compter de l'accès aux données — nous nous occupons de tout (contact prestataire données, processus complet jusqu'à la livraison)."
+    ) +
+    p("Excellente fin de journée, et je reste à votre disposition.") +
+    SIGNATURE_HTML;
+
+  return { subject, html: wrap(body) };
 }
 
 // ───────────────────────── Notification RDV → support (F) ─────────────────────────
