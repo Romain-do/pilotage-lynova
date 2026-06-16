@@ -13,6 +13,7 @@ import { updateProspect, addComment, archiveProspect } from "./actions";
 import { MeetingForm } from "./MeetingForm";
 import { DateSelect } from "./DateSelect";
 import { PresentationEmail } from "./PresentationEmail";
+import { RdvSynthesisEmail } from "./RdvSynthesisEmail";
 
 export function ProspectDrawer({
   prospect,
@@ -235,6 +236,8 @@ export function ProspectDrawer({
           {/* E-mails Outlook — accessibles à tout utilisateur authentifié (envoi depuis le
               compte Microsoft partagé ; les actions serveur re-vérifient l'auth via requireUser). */}
           <PresentationEmail prospect={prospect} />
+          {/* Synthèse RDV : DIRIGEANT uniquement (condition UI + garde serveur requireDirigeant). */}
+          {currentUser.role === "DIRIGEANT" && <RdvSynthesisEmail prospect={prospect} />}
           <MeetingForm prospect={prospect} />
 
           {/* Commentaires */}

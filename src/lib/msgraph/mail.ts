@@ -5,12 +5,22 @@ import { GRAPH_API_BASE } from "./config";
 import { getAccessToken } from "./auth";
 import { GraphError } from "./graph";
 
+/** Pièce jointe « inline » (fileAttachment) — contenu encodé en base64. Le message total doit
+ *  rester < 4 Mo (limite Graph sendMail) ; au-delà, il faudrait une upload session. */
+export interface MailAttachment {
+  name: string;
+  contentType: string;
+  /** Contenu du fichier encodé en base64. */
+  contentBytes: string;
+}
+
 export interface SendMailInput {
   subject: string;
   /** Corps HTML. */
   html: string;
   to: string[];
   cc?: string[];
+  attachments?: MailAttachment[];
 }
 
 /**
@@ -22,6 +32,12 @@ export async function sendMail(input: SendMailInput): Promise<void> {
 
   const toRecipients = input.to.map((address) => ({ emailAddress: { address } }));
   const ccRecipients = (input.cc ?? []).map((address) => ({ emailAddress: { address } }));
+  const attachments = (input.attachments ?? []).map((a) => ({
+    "@odata.type": "#microsoft.graph.fileAttachment",
+    name: a.name,
+    contentType: a.contentType,
+    contentBytes: a.contentBytes,
+  }));
 
   const res = await fetch(`${GRAPH_API_BASE}/me/sendMail`, {
     method: "POST",
@@ -35,6 +51,7 @@ export async function sendMail(input: SendMailInput): Promise<void> {
         body: { contentType: "HTML", content: input.html },
         toRecipients,
         ccRecipients,
+        ...(attachments.length ? { attachments } : {}),
       },
       saveToSentItems: true,
     }),
