@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { ProspectDTO } from "@/lib/prospection";
 import { createMeeting, type MeetingActionState } from "./meeting-actions";
 import { DateSelect } from "./DateSelect";
+import { LastSent, ResendConfirm } from "./contact-sent";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,8 +17,17 @@ function defaultSubject(prospect: ProspectDTO): string {
   return `Lynova x ${prospect.company?.trim() || "votre structure"} : Démonstration`;
 }
 
-export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
+export function MeetingForm({
+  prospect,
+  lastSentAt = null,
+  onSent,
+}: {
+  prospect: ProspectDTO;
+  lastSentAt?: string | null;
+  onSent?: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const [subject, setSubject] = useState(defaultSubject(prospect));
   const [prospectEmail, setProspectEmail] = useState(prospect.email ?? "");
@@ -63,7 +73,12 @@ export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
         durationMinutes: duration,
       });
       setResult(state);
+      if (state.ok) { onSent?.(); setConfirming(false); }
     });
+  }
+  function handleSubmitClick() {
+    if (lastSentAt && !confirming) { setConfirming(true); return; }
+    submit();
   }
 
   if (!open) {
@@ -76,6 +91,7 @@ export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
         >
           📅 Inviter à un RDV
         </button>
+        <LastSent iso={lastSentAt} />
       </div>
     );
   }
@@ -256,14 +272,20 @@ export function MeetingForm({ prospect }: { prospect: ProspectDTO }) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={submit}
-        disabled={pending || !date || !prospectEmail}
-        className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
-      >
-        {pending ? "Envoi de l'invitation…" : "Envoyer l'invitation"}
-      </button>
+      <LastSent iso={lastSentAt} />
+
+      {confirming && lastSentAt ? (
+        <ResendConfirm iso={lastSentAt} onConfirm={submit} onCancel={() => setConfirming(false)} pending={pending} />
+      ) : (
+        <button
+          type="button"
+          onClick={handleSubmitClick}
+          disabled={pending || !date || !prospectEmail}
+          className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
+        >
+          {pending ? "Envoi de l'invitation…" : "Envoyer l'invitation"}
+        </button>
+      )}
     </div>
   );
 }

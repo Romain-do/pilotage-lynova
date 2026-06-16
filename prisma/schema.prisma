@@ -257,6 +257,7 @@ model Prospect {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   comments     Comment[]
+  contactLogs  ContactLog[]
 
   @@index([stageId, position])
   @@index([groupId])
@@ -287,4 +288,28 @@ model Comment {
 
   @@index([prospectId, createdAt])
   @@map("prospect_comment")
+}
+
+/// Type d'envoi tracé pour l'anti-double-envoi (présentation, synthèse RDV, RDV Outlook).
+enum ContactType {
+  PRESENTATION
+  RDV_SYNTHESIS
+  MEETING
+}
+
+/// Trace d'un envoi sortant vers un prospect (anti-double-envoi). Une ligne par envoi RÉUSSI.
+/// `live` distingue l'envoi réel (prod) de l'envoi test (redirigé vers romain@lynova.net).
+model ContactLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  prospectId String      @db.Uuid
+  prospect   Prospect    @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  type       ContactType
+  sentAt     DateTime    @default(now())
+  sentById   String?     @db.Uuid // app_user.id de l'expéditeur
+  sentByName String? // dénormalisé pour l'affichage
+  recipient  String // adresse réellement destinataire (romain en test, prospect en live)
+  live       Boolean // true = envoi réel, false = test
+
+  @@index([prospectId, type, sentAt])
+  @@map("contact_log")
 }

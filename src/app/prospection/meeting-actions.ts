@@ -7,6 +7,8 @@ import { isMsGraphConnected } from "@/lib/msgraph/auth";
 import { createCalendarEvent, GraphError } from "@/lib/msgraph/graph";
 import { sendMail } from "@/lib/msgraph/mail";
 import { meetingNotificationEmail, MEETING_NOTIFY_TO } from "@/lib/email/templates";
+import { emailsLive, TEST_RECIPIENT } from "@/lib/email/delivery";
+import { logContact } from "@/lib/contact-log";
 
 // Server action de création d'un RDV Outlook/Teams (§ RDV prospect). Tout utilisateur
 // authentifié : l'événement est créé dans le calendrier Microsoft partagé et les invitations
@@ -49,7 +51,7 @@ function addMinutes(startDateTime: string, minutes: number): string {
 }
 
 export async function createMeeting(input: MeetingInput): Promise<MeetingActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const parsed = meetingSchema.safeParse(input);
   if (!parsed.success) {
@@ -64,8 +66,10 @@ export async function createMeeting(input: MeetingInput): Promise<MeetingActionS
     };
   }
 
-  // Participants : prospect + destinataires additionnels (dédupliqués).
-  const emails = Array.from(new Set([data.prospectEmail, ...data.additionalEmails]));
+  // Garde-fou test unifié : en live, on invite le prospect + destinataires additionnels (dédup) ;
+  // en mode test (EMAILS_LIVE ≠ true), SEUL romain est invité (le vrai prospect ne reçoit rien).
+  const live = emailsLive();
+  const emails = live ? Array.from(new Set([data.prospectEmail, ...data.additionalEmails])) : [TEST_RECIPIENT];
 
   const startDateTime = `${data.date}T${data.time}:00`;
   const endDateTime = addMinutes(startDateTime, data.durationMinutes);
@@ -80,7 +84,8 @@ export async function createMeeting(input: MeetingInput): Promise<MeetingActionS
       locationDisplayName: data.mode === "physique" ? data.address : null,
     });
 
-    // Notification interne → support@lynova.net (F). N'échoue PAS le RDV si le mail rate.
+    // Notification interne → support@lynova.net (live) / romain (test). N'échoue PAS le RDV si le mail rate.
+    const notifTo = live ? MEETING_NOTIFY_TO : TEST_RECIPIENT;
     let notifyWarning = "";
     try {
       const prospect = await prisma.prospect.findUnique({
@@ -100,18 +105,31 @@ export async function createMeeting(input: MeetingInput): Promise<MeetingActionS
         address: data.address ?? null,
         joinUrl: event.joinUrl,
       });
-      await sendMail({ subject: notif.subject, html: notif.html, to: [MEETING_NOTIFY_TO] });
+      await sendMail({ subject: notif.subject, html: notif.html, to: [notifTo] });
     } catch (e) {
       console.error("[msgraph] notif RDV:", e instanceof Error ? e.message : e);
-      notifyWarning = ` (notification ${MEETING_NOTIFY_TO} non envoyée)`;
+      notifyWarning = ` (notification ${notifTo} non envoyée)`;
     }
+
+    // Trace anti-double-envoi (best-effort, ne fait pas échouer le RDV).
+    await logContact({
+      prospectId: data.prospectId,
+      type: "MEETING",
+      recipient: live ? data.prospectEmail : TEST_RECIPIENT,
+      live,
+      sentById: user.id,
+      sentByName: user.name,
+    });
+
+    const baseMessage = live
+      ? data.mode === "visio"
+        ? "RDV Teams créé et invitations envoyées."
+        : "RDV créé et invitations envoyées."
+      : `Mode test — RDV ${data.mode === "visio" ? "Teams " : ""}créé avec toi en invité (${TEST_RECIPIENT}), le prospect n'est pas invité.`;
 
     return {
       ok: true,
-      message:
-        (data.mode === "visio"
-          ? "RDV Teams créé et invitations envoyées."
-          : "RDV créé et invitations envoyées.") + notifyWarning,
+      message: baseMessage + notifyWarning,
       webLink: event.webLink ?? undefined,
       joinUrl: event.joinUrl ?? undefined,
     };

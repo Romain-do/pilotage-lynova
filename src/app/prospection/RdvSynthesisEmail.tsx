@@ -4,13 +4,23 @@ import { useState, useTransition } from "react";
 import type { ProspectDTO } from "@/lib/prospection";
 import { rdvSynthesisEmail, RDV_SYNTHESIS_CC } from "@/lib/email/templates";
 import { sendRdvSynthesisEmail, type MailActionState } from "./mail-actions";
+import { LastSent, ResendConfirm } from "./contact-sent";
 
 // Bouton « Envoyer la synthèse RDV » (DIRIGEANT only — rendu conditionnel dans ProspectDrawer +
 // garde serveur requireDirigeant). Aperçu (objet + corps + mention PJ) puis envoi, avec la
-// présentation PDF jointe. L'aperçu utilise le MÊME gabarit pur que l'envoi serveur.
-export function RdvSynthesisEmail({ prospect }: { prospect: ProspectDTO }) {
+// présentation PDF jointe. `lastSentAt`/`onSent` : anti-doublon (mention + confirmation avant renvoi).
+export function RdvSynthesisEmail({
+  prospect,
+  lastSentAt = null,
+  onSent,
+}: {
+  prospect: ProspectDTO;
+  lastSentAt?: string | null;
+  onSent?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<MailActionState | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
 
   const { subject, html } = rdvSynthesisEmail(prospect);
@@ -18,7 +28,15 @@ export function RdvSynthesisEmail({ prospect }: { prospect: ProspectDTO }) {
 
   function send() {
     setResult(null);
-    start(async () => setResult(await sendRdvSynthesisEmail(prospect.id)));
+    start(async () => {
+      const r = await sendRdvSynthesisEmail(prospect.id);
+      setResult(r);
+      if (r.ok) { onSent?.(); setConfirming(false); }
+    });
+  }
+  function handleSendClick() {
+    if (lastSentAt && !confirming) { setConfirming(true); return; }
+    send();
   }
 
   if (!open) {
@@ -31,6 +49,7 @@ export function RdvSynthesisEmail({ prospect }: { prospect: ProspectDTO }) {
         >
           📄 Envoyer la synthèse RDV
         </button>
+        <LastSent iso={lastSentAt} />
       </div>
     );
   }
@@ -84,14 +103,20 @@ export function RdvSynthesisEmail({ prospect }: { prospect: ProspectDTO }) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={send}
-        disabled={pending || !to}
-        className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
-      >
-        {pending ? "Envoi…" : "Envoyer la synthèse RDV"}
-      </button>
+      <LastSent iso={lastSentAt} />
+
+      {confirming && lastSentAt ? (
+        <ResendConfirm iso={lastSentAt} onConfirm={send} onCancel={() => setConfirming(false)} pending={pending} />
+      ) : (
+        <button
+          type="button"
+          onClick={handleSendClick}
+          disabled={pending || !to}
+          className="w-full rounded-lg bg-navy px-4 py-2 font-medium text-white hover:bg-navy-700 disabled:opacity-60"
+        >
+          {pending ? "Envoi…" : "Envoyer la synthèse RDV"}
+        </button>
+      )}
     </div>
   );
 }
