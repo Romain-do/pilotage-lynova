@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireDirigeant } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { syncEvoliz, syncEvolizBuys } from "@/lib/evoliz/sync";
 import { syncRevolut } from "@/lib/revolut/sync";
 
@@ -34,9 +35,9 @@ export async function refreshAll(): Promise<{ ok: boolean; message: string; last
   // Invalide les caches des sources resynchronisées avec succès.
   // updateTag = read-your-own-writes (server action) : la donnée fraîche s'affiche dès le
   // 1er rendu après « Actualiser » (pas de stale). Interop avec unstable_cache vérifiée.
-  if (inv) updateTag("evoliz-invoices");
-  if (buys) updateTag("evoliz-buys");
-  if (rev) updateTag("revolut");
+  if (inv) updateTag(CACHE_TAGS.evolizInvoices);
+  if (buys) updateTag(CACHE_TAGS.evolizBuys);
+  if (rev) updateTag(CACHE_TAGS.revolut);
 
   // Toutes les vues qui consomment ces caches (filet : purge aussi le cache de route).
   for (const path of ["/", "/facturation", "/tresorerie", "/prospection"]) revalidatePath(path);

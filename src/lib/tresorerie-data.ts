@@ -4,6 +4,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { TAccount, MonthRow, OutflowRow, CryptoPnl } from "@/lib/tresorerie";
 
 const FIAT = new Set(["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK", "PLN"]);
@@ -186,5 +187,5 @@ export async function buildTresorerie(prisma: PrismaClient): Promise<TresorerieD
 export const getTresorerie = unstable_cache(
   async (): Promise<TresorerieData> => buildTresorerie(prisma),
   ["tresorerie-data"],
-  { tags: ["revolut"], revalidate: 3600 }
+  { tags: [CACHE_TAGS.revolut], revalidate: 3600 }
 );

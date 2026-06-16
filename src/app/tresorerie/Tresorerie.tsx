@@ -17,6 +17,7 @@ import {
   presetLabel,
   shiftYear,
   rangeLabel,
+  formatDateFR,
   type DateRange,
   type PresetKey,
 } from "@/lib/facturation";
@@ -98,6 +99,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <select
+              aria-label="Choisir l'exercice fiscal"
               value={period.kind === "fy" ? String(period.fy) : ""}
               onChange={(e) => e.target.value && setPeriod({ kind: "fy", fy: Number(e.target.value) })}
               className="rounded-card border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-card focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
@@ -392,7 +394,7 @@ function CategoryDrawer({ cat, lines, onClose }: { cat: TCatRow; lines: OutflowR
             <tbody>
               {lines.map((l, i) => (
                 <tr key={i} className="border-t border-line/70">
-                  <td className="py-2 pr-3 text-ink-2">{l.date.slice(8, 10)}/{l.date.slice(5, 7)}/{l.date.slice(0, 4)}</td>
+                  <td className="py-2 pr-3 text-ink-2">{formatDateFR(l.date)}</td>
                   <td className="py-2 pr-3 text-ink">{l.counterparty ?? "—"}</td>
                   <td className="py-2 text-right font-medium text-ink">{euro(l.amount)}</td>
                 </tr>

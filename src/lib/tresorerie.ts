@@ -211,17 +211,22 @@ export function remuByFiscalMonth(outflows: OutflowRow[], fy: number): number[] 
 /** Charges Revolut (hors deny-list) ventilées par catégorie ET par mois CIVIL, alignées sur
  *  `months` (mêmes clés YYYY-MM que `computeRange`). Sert la barre empilée « CA vs charges ».
  *  Chaque catégorie → un tableau de longueur `months`. Mois hors `months` ignorés ; mois sans
- *  décaissement (avant les données bancaires) → 0. La somme de toutes les catégories sur la plage
- *  égale `netChargesInRange(range).total` (mêmes outflows, même deny-list). */
+ *  décaissement (avant les données bancaires) → 0.
+ *  Le `range` borne au JOUR (comme `netChargesInRange`) → les mois partiels (1er/dernier, ex. plage
+ *  « Perso » au 15) ne comptent que les décaissements DANS la plage. Σ de toutes les catégories ==
+ *  `netChargesInRange(range).total` y compris sur un mois incomplet (mêmes outflows, même deny-list,
+ *  même borne). */
 export function chargeComponentsByMonth(
   outflows: OutflowRow[],
-  months: { key: string }[]
+  months: { key: string }[],
+  range: DateRange
 ): Record<ChargeCategory, number[]> {
   const idx = new Map(months.map((m, i) => [m.key, i]));
   const out = Object.fromEntries(
     CHARGE_CATEGORIES.map((c) => [c, new Array(months.length).fill(0)])
   ) as Record<ChargeCategory, number[]>;
   for (const o of outflows) {
+    if (!dateInRange(o.date, range)) continue; // borne jour → cohérent avec netChargesInRange
     const i = idx.get(o.date.slice(0, 7));
     if (i == null) continue;
     const cc = chargeCategoryOf(o.reference, o.counterparty);
@@ -242,12 +247,14 @@ export interface HorsExploitationSeries {
 }
 export function horsExploitationByMonth(
   outflows: OutflowRow[],
-  months: { key: string }[]
+  months: { key: string }[],
+  range: DateRange
 ): HorsExploitationSeries {
   const idx = new Map(months.map((m, i) => [m.key, i]));
   const tva = new Array(months.length).fill(0);
   const is = new Array(months.length).fill(0);
   for (const o of outflows) {
+    if (!dateInRange(o.date, range)) continue; // même borne jour que la barre charges
     const i = idx.get(o.date.slice(0, 7));
     if (i == null) continue;
     const c = categorize(o.reference, o.counterparty);

@@ -18,6 +18,7 @@ import {
 } from "@tabler/icons-react";
 import {
   euro,
+  apportionEuros,
   formatDateFR,
   computeRange,
   computeMRR,
@@ -100,9 +101,9 @@ export function Facturation({
   // Charges Revolut ventilées par catégorie & par mois civil (alignées sur cur.months) pour la
   // barre empilée « CA vs charges ». CA − charges = marge nette du mois (mêmes charges, même
   // deny-list que netChargesInRange).
-  const chargeComps = useMemo(() => chargeComponentsByMonth(outflows, cur.months), [outflows, cur.months]);
+  const chargeComps = useMemo(() => chargeComponentsByMonth(outflows, cur.months, range), [outflows, cur.months, range]);
   // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
-  const horsExploit = useMemo(() => horsExploitationByMonth(outflows, cur.months), [outflows, cur.months]);
+  const horsExploit = useMemo(() => horsExploitationByMonth(outflows, cur.months, range), [outflows, cur.months, range]);
 
   // ── Marge nette = CA HT − charges Revolut (tous décaissements externes hors deny-list TVA/IS) ──
   // La marge COMMERCIALE (cur.marge = CA − achats Evoliz) reste séparée et inchangée.
@@ -250,9 +251,9 @@ export function Facturation({
         <div className="rounded-card border border-line bg-white p-4 shadow-card">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">Clients</h2>
-            <div className="inline-flex rounded-[10px] border border-line bg-cloud p-0.5 text-xs">
+            <div className="inline-flex rounded-[10px] border border-line bg-cloud p-0.5 text-xs" role="group" aria-label="Trier les clients">
               {(["ca", "abo"] as const).map((k) => (
-                <button key={k} type="button" onClick={() => setClientSort(k)}
+                <button key={k} type="button" onClick={() => setClientSort(k)} aria-pressed={clientSort === k}
                   className={`rounded-md px-2.5 py-1 font-medium transition-colors ${clientSort === k ? "bg-navy text-white" : "text-ink-2 hover:text-ink"}`}>
                   {k === "ca" ? "Par total" : "Par abonnement"}
                 </button>
@@ -317,6 +318,7 @@ function Toolbar({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <select
+          aria-label="Choisir l'exercice fiscal"
           value={period.kind === "fy" ? String(period.fy) : ""}
           onChange={(e) => e.target.value && setPeriod({ kind: "fy", fy: Number(e.target.value) })}
           className="rounded-card border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-card focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
@@ -389,6 +391,9 @@ function MargeNetteCard({
 }) {
   // Détail accessible souris (group-hover), tactile & clavier (toggle `open` + ×).
   const [open, setOpen] = useState(false);
+  // Ventilation arrondie par apportionnement → CA HT − Σ postes == marge nette affichée (tombe juste).
+  const detailCats = CHARGE_META.filter((m) => net.byCategory[m.key] > 0);
+  const detailRounded = apportionEuros(detailCats.map((m) => net.byCategory[m.key]), Math.round(caHtTotal) - Math.round(value));
   return (
     <div className="group relative rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex items-center gap-2">
@@ -447,10 +452,10 @@ function MargeNetteCard({
             )}
             <div className="pr-4 font-semibold text-ink">Marge nette = CA HT − charges d&apos;exploitation (TTC)</div>
             <div className="mt-2 space-y-1">
-              <TipRow label="CA HT" value={euro(caHtTotal)} />
+              <TipRow label="CA HT" value={euro(Math.round(caHtTotal))} />
               <div className="my-1 border-t border-line" />
-              {CHARGE_META.filter((m) => net.byCategory[m.key] > 0).map((m) => (
-                <TipRow key={m.key} label={`− ${m.label}`} value={euro(-net.byCategory[m.key])} />
+              {detailCats.map((m, k) => (
+                <TipRow key={m.key} label={`− ${m.label}`} value={euro(-detailRounded[k])} />
               ))}
               <div className="mt-1 border-t border-line pt-1"><TipRow label="= Marge nette" value={euro(value)} strong /></div>
             </div>

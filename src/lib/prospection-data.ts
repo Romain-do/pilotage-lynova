@@ -8,6 +8,7 @@
 // Filet : revalidate 3600 s. Tag commun "prospection" → invalide /prospection ET le Cockpit.
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { StageDTO, GroupDTO } from "@/lib/prospection";
 import { mapProspect } from "@/lib/prospection-map";
 
@@ -55,7 +56,7 @@ export const getProspectionBoard = unstable_cache(
     };
   },
   ["prospection-board"],
-  { tags: ["prospection"], revalidate: 3600 }
+  { tags: [CACHE_TAGS.prospection], revalidate: 3600 }
 );
 
 /** Prospect allégé pour les KPI / « À recontacter » du Cockpit. reminderAt en ISO (sérialisé). */
@@ -110,5 +111,5 @@ export const getCockpitProspection = unstable_cache(
     );
   },
   ["cockpit-prospection"],
-  { tags: ["prospection"], revalidate: 3600 }
+  { tags: [CACHE_TAGS.prospection], revalidate: 3600 }
 );

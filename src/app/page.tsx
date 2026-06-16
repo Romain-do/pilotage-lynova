@@ -103,9 +103,9 @@ async function buildCockpitData(): Promise<CockpitData> {
   // autres graphes du Cockpit).
   const tresoSeries = seriesForRange(treso.months, range);
   // CA vs charges — mensuel HT (exercice en cours). Mêmes charges que la marge nette ⇒ cohérence.
-  const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months);
+  const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months, range);
   // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
-  const horsExploit = horsExploitationByMonth(treso.outflows, cur.months);
+  const horsExploit = horsExploitationByMonth(treso.outflows, cur.months, range);
   const caVsCharges = {
     months: cur.months,
     abo: cur.aboByMonth,
@@ -163,9 +163,14 @@ async function buildCockpitData(): Promise<CockpitData> {
   if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${mrr.pct.toFixed(0)} %)`, href: "/facturation" });
   if (counts.a_rencontrer > 0) alerts.push({ tone: "info", text: `${counts.a_rencontrer} prospect${counts.a_rencontrer > 1 ? "s" : ""} à rencontrer`, href: "/prospection" });
 
+  // Aucune donnée d'aucune source (cache vide, avant toute synchro) → état vide dédié au Cockpit,
+  // au lieu d'afficher des « 0 € » partout qui ressembleraient à de vraies valeurs.
+  const isEmpty = docs.length === 0 && treso.accounts.length === 0 && treso.outflows.length === 0 && rows.length === 0;
+
   return {
     fyLabel: fyLabel(fy),
     fy,
+    isEmpty,
     lastSync,
     freshness,
     // Mention « partiellement à jour » pour les indicateurs composites (Evoliz × Revolut) si une
