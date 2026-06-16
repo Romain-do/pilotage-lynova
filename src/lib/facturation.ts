@@ -64,6 +64,24 @@ export function euro(n: number, decimals = 0): string {
   }).format(n);
 }
 
+/** Arrondit `values` (≥ 0) à l'euro en GARANTISSANT que leur somme vaut `Math.round(target)`
+ *  (méthode du plus fort reste). Sert aux tooltips de ventilation : les lignes affichées « tombent
+ *  juste » (Σ parts == total affiché), au lieu d'arrondir chaque ligne indépendamment. */
+export function apportionEuros(values: number[], target: number): number[] {
+  const t = Math.round(target);
+  const out = values.map((v) => Math.floor(v));
+  let rem = t - out.reduce((s, x) => s + x, 0);
+  // Ordre des plus fortes fractions résiduelles → reçoivent les unités restantes d'abord.
+  const byFrac = values.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; rem > 0 && k < byFrac.length; k++, rem--) out[byFrac[k].i] += 1;
+  // Cas rare (target < Σ planchers) : on retire aux plus faibles fractions, sans passer sous 0.
+  for (let k = byFrac.length - 1; rem < 0 && k >= 0; k--) {
+    const j = byFrac[k].i;
+    if (out[j] > 0) { out[j] -= 1; rem++; }
+  }
+  return out;
+}
+
 const MONTH_ABBR = [
   "janv", "févr", "mars", "avr", "mai", "juin", "juil", "août", "sept", "oct", "nov", "déc",
 ];

@@ -2,7 +2,7 @@
 
 import { Fragment, type CSSProperties } from "react";
 import { IconX } from "@tabler/icons-react";
-import { euro } from "@/lib/facturation";
+import { euro, apportionEuros } from "@/lib/facturation";
 import { CHARGE_CATEGORIES, type ChargeCategory } from "@/lib/tresorerie";
 import { useChartSelection } from "@/components/useChartSelection";
 
@@ -271,14 +271,18 @@ function ChargesTooltip({
   const chargeTotal = CHARGE_CATEGORIES.reduce((s, c) => s + charges[c][index], 0);
   // Données bancaires absentes pour ce mois (avant le 1er décaissement capté) → marge nette indisponible.
   const degraded = bankStart == null || monthKey < bankStart.slice(0, 7);
-  const margeNette = ca - chargeTotal;
-  const taux = ca > 0 ? (margeNette / ca) * 100 : null;
   const left = ((index + 0.5) / n) * 100;
   const alignRight = index > n * 0.66;
   // Lignes synchronisées avec la barre & la légende : un poste par segment affiché (6 max), même
   // couleur. « Autres » (catch-all composite) est détaillé en sous-lignes indentées pour signaler
-  // ce qu'il regroupe (cf. CHARGE_META).
-  const segRows = BAR_SEGMENTS.map((seg) => ({ seg, value: segValue(seg, charges, index) })).filter((r) => r.value > 0);
+  // ce qu'il regroupe (cf. CHARGE_META). Montants arrondis par apportionnement → Σ des postes ==
+  // « Total charges » affiché (le tooltip « tombe juste »), et marge = CA − total (mêmes arrondis).
+  const segRoundedAll = apportionEuros(BAR_SEGMENTS.map((seg) => segValue(seg, charges, index)), chargeTotal);
+  const roundedChargeTotal = segRoundedAll.reduce((s, x) => s + x, 0); // == Math.round(chargeTotal)
+  const roundedCa = Math.round(ca);
+  const margeNette = roundedCa - roundedChargeTotal;
+  const taux = roundedCa > 0 ? (margeNette / roundedCa) * 100 : null;
+  const segRows = BAR_SEGMENTS.map((seg, k) => ({ seg, value: segRoundedAll[k] })).filter((r) => r.value > 0);
   const autresSeg = BAR_SEGMENTS[BAR_SEGMENTS.length - 1];
   const autresSubs = autresSeg.cats.filter((c) => c !== "Autres" && charges[c][index] > 0);
   const hasHors = tva > 0 || is > 0;
@@ -299,7 +303,7 @@ function ChargesTooltip({
       )}
       <div className="pr-4 font-semibold text-ink">{label}</div>
       <div className="mt-2">
-        <TipRow label="CA HT" value={euro(ca)} strong />
+        <TipRow label="CA HT" value={euro(roundedCa)} strong />
       </div>
 
       {/* Bloc 1 — Charges d'exploitation (→ entrent dans la marge nette) */}
@@ -327,7 +331,7 @@ function ChargesTooltip({
                 )
               )}
               <div className="border-t border-line pt-1">
-                <TipRow label="Total charges" value={euro(chargeTotal)} strong />
+                <TipRow label="Total charges" value={euro(roundedChargeTotal)} strong />
               </div>
             </div>
           </>

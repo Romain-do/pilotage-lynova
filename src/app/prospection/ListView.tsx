@@ -637,8 +637,13 @@ function Th({
   onClick: () => void;
 }) {
   return (
-    <th className="px-4 py-3 font-medium">
-      <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 hover:text-navy ${active ? "text-navy" : ""}`}>
+    <th className="px-4 py-3 font-medium" aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`Trier par ${label}${active ? (dir === "asc" ? " (croissant)" : " (décroissant)") : ""}`}
+        className={`inline-flex items-center gap-1 hover:text-navy ${active ? "text-navy" : ""}`}
+      >
         {label}
         {active && <span aria-hidden>{dir === "asc" ? "▲" : "▼"}</span>}
       </button>

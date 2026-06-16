@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { syncEvoliz, syncEvolizBuys } from "@/lib/evoliz/sync";
 import { syncRevolut } from "@/lib/revolut/sync";
 
@@ -52,9 +53,9 @@ export async function GET(request: Request) {
   // Invalide les caches dès que la source correspondante est resynchronisée.
   // Sans ça, les données cachées resteraient figées après la synchro horaire.
   // Next 16 : 2e arg requis ("max" = SWR recommandé ; pour unstable_cache = invalidation du tag).
-  if (evoliz.ok) revalidateTag("evoliz-invoices", "max");
-  if (evolizBuys.ok) revalidateTag("evoliz-buys", "max");
-  if (revolut.ok) revalidateTag("revolut", "max");
+  if (evoliz.ok) revalidateTag(CACHE_TAGS.evolizInvoices, "max");
+  if (evolizBuys.ok) revalidateTag(CACHE_TAGS.evolizBuys, "max");
+  if (revolut.ok) revalidateTag(CACHE_TAGS.revolut, "max");
 
   const sources = { evoliz, evolizBuys, revolut };
   const ok = Object.values(sources).every((r) => r.ok);

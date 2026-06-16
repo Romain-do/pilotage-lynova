@@ -40,7 +40,7 @@ export function AppNav({ role }: { role: string }) {
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={`inline-flex flex-none items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+        className={`inline-flex flex-none items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan ${
           active ? activeClass(brand) : "text-white/70 hover:bg-white/10 hover:text-white"
         }`}
       >
@@ -54,17 +54,17 @@ export function AppNav({ role }: { role: string }) {
     <header className="bg-navy text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-4">
-          <Link href={home} className="flex-none"><Logo className="text-lg text-white" /></Link>
+          <Link href={home} className="flex-none rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"><Logo className="text-lg text-white" /></Link>
           <nav className="hidden items-center gap-1 md:flex">{links.map((l) => <Item key={l.href} {...l} />)}</nav>
         </div>
         <div className="flex flex-none items-center gap-3">
           {isDirigeant && (
-            <Link href="/admin" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10">
+            <Link href="/admin" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
               Administration
             </Link>
           )}
           <form action="/auth/signout" method="post">
-            <button type="submit" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10">
+            <button type="submit" className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
               Se déconnecter
             </button>
           </form>

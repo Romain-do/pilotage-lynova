@@ -11,6 +11,7 @@
 // Filet : revalidate 3600 s.
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { FactDoc, BuyDoc, BuyItemDoc } from "@/lib/facturation";
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -44,7 +45,7 @@ export const getEvolizInvoices = unstable_cache(
     }));
   },
   ["evoliz-invoices"],
-  { tags: ["evoliz-invoices"], revalidate: 3600 }
+  { tags: [CACHE_TAGS.evolizInvoices], revalidate: 3600 }
 );
 
 /**
@@ -81,5 +82,5 @@ export const getEvolizBuys = unstable_cache(
     return { buys, items };
   },
   ["evoliz-buys"],
-  { tags: ["evoliz-buys"], revalidate: 3600 }
+  { tags: [CACHE_TAGS.evolizBuys], revalidate: 3600 }
 );

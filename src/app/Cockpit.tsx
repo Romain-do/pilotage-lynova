@@ -31,6 +31,8 @@ import type { Freshness } from "@/lib/sync-state";
 export interface CockpitData {
   fyLabel: string;
   fy: number;
+  // Cache vide (aucune source) → état vide dédié au lieu de « 0 € » partout.
+  isEmpty: boolean;
   lastSync: string | null;
   // Fraîcheur par source (Evoliz / Revolut) + mention « partiellement à jour » pour les composites.
   freshness: Freshness;
@@ -104,6 +106,10 @@ export function Cockpit({
           <RefreshButton initialLastSync={data.lastSync} freshness={data.freshness} />
         </div>
 
+        {data.isEmpty ? (
+          <CockpitEmpty />
+        ) : (
+        <>
         {/* Actions prioritaires */}
         <div className="mt-6">
           <h2 className="text-sm font-semibold text-ink">Actions prioritaires</h2>
@@ -241,7 +247,26 @@ export function Cockpit({
           <strong className="text-ink-2">Lecture seule</strong> · finances Evoliz + trésorerie Revolut · marge nette
           approchée (charges nettes captées depuis nov. 2024) · prospection native.
         </p>
+        </>
+        )}
       </section>
     </main>
+  );
+}
+
+// État vide du Cockpit : aucune donnée d'aucune source (avant la 1re synchro). Évite d'afficher des
+// « 0 € » trompeurs ; invite à synchroniser (le bouton « Actualiser » est déjà dans l'en-tête).
+function CockpitEmpty() {
+  return (
+    <div className="mt-10 flex flex-col items-center justify-center rounded-card border border-line bg-white px-6 py-16 text-center shadow-card">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan/15 text-cyan-600">
+        <IconWallet size={24} stroke={2} />
+      </span>
+      <h2 className="mt-5 text-lg font-semibold text-ink">Aucune donnée à afficher</h2>
+      <p className="mt-2 max-w-md text-sm text-ink-3">
+        Le cache est vide. Lancez une synchronisation (Evoliz + Revolut) avec « Actualiser » ci-dessus pour
+        alimenter le Cockpit. La prospection apparaîtra dès le premier prospect ajouté.
+      </p>
+    </div>
   );
 }

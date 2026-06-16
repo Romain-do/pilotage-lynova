@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireDirigeant } from "@/lib/auth";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { ProspectDTO, CommentDTO, GroupDTO } from "@/lib/prospection";
 import { mapProspect, mapComment } from "@/lib/prospection-map";
 
@@ -32,7 +33,7 @@ function parseDate(v: FormDataEntryValue | null): Date | null {
  * (tag "prospection") ; `revalidatePath` purge en plus le cache de la route /prospection.
  */
 function bumpProspection(): void {
-  updateTag("prospection");
+  updateTag(CACHE_TAGS.prospection);
   revalidatePath("/prospection");
 }
 
