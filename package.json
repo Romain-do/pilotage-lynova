@@ -12,6 +12,7 @@
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "dotenv -e .env.local -- prisma studio",
+    "check:sync": "dotenv -e .env.local -- tsx scripts/check-sync.ts",
     "seed:users": "tsx scripts/seed-users.ts",
     "seed:prospection": "tsx scripts/seed-prospection.ts",
     "import:trello": "tsx scripts/import-trello.ts",
