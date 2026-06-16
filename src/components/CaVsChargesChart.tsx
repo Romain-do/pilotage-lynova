@@ -156,6 +156,8 @@ export function CaVsChargesChart({ data, bankStart }: { data: ChargeSeries; bank
           monthKey={months[hover].key}
           ca={ca[hover]}
           chargeTotal={chargeTotal[hover]}
+          tva={horsExploit?.tva[hover] ?? 0}
+          is={horsExploit?.is[hover] ?? 0}
           bankStart={bankStart}
         />
       )}
@@ -226,14 +228,15 @@ function StackedBar({
 
 // Tooltip léger au survol/focus : CA, Charges, Marge nette (ou mention dégradée). Pas de détail.
 function LightTooltip({
-  index, n, label, monthKey, ca, chargeTotal, bankStart,
+  index, n, label, monthKey, ca, chargeTotal, tva, is, bankStart,
 }: {
-  index: number; n: number; label: string; monthKey: string; ca: number; chargeTotal: number; bankStart: string | null;
+  index: number; n: number; label: string; monthKey: string; ca: number; chargeTotal: number; tva: number; is: number; bankStart: string | null;
 }) {
   const degraded = bankStart == null || monthKey < bankStart.slice(0, 7);
   const roundedCa = Math.round(ca);
   const roundedCharges = Math.round(chargeTotal);
   const marge = roundedCa - roundedCharges;
+  const hasHors = !degraded && (tva > 0 || is > 0);
   const left = ((index + 0.5) / n) * 100;
   const alignRight = index > n * 0.66;
   return (
@@ -253,6 +256,17 @@ function LightTooltip({
           </>
         )}
       </div>
+      {/* Hors exploitation (TVA/IS) — affiché seulement si > 0 ; n'entre pas dans la marge. */}
+      {hasHors && (
+        <div className="mt-1.5 border-t border-line pt-1.5">
+          <div className="text-[10px] uppercase tracking-wide text-ink-3">Hors exploitation</div>
+          <div className="mt-1 space-y-1">
+            {tva > 0 && <TipRow label="TVA" value={euro(Math.round(tva))} color="bg-slate-300" hatch />}
+            {is > 0 && <TipRow label="IS" value={euro(Math.round(is))} color="bg-slate-500" hatch />}
+          </div>
+          <div className="mt-0.5 text-[10px] italic leading-tight text-ink-3">N&apos;entre pas dans la marge.</div>
+        </div>
+      )}
       <div className="mt-1.5 text-[10px] italic text-ink-3">Cliquez pour le détail →</div>
     </div>
   );
@@ -394,10 +408,10 @@ function MonthDrawer({
   );
 }
 
-function TipRow({ label, value, strong, color }: { label: string; value: string; strong?: boolean; color?: string }) {
+function TipRow({ label, value, strong, color, hatch }: { label: string; value: string; strong?: boolean; color?: string; hatch?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
-      {color && <span className={`h-2 w-2 flex-none rounded-sm ${color}`} aria-hidden />}
+      {color && <span className={`h-2 w-2 flex-none rounded-sm ${color}`} style={hatch ? HATCH_STYLE : undefined} aria-hidden />}
       <span className="text-ink-2">{label}</span>
       <span className={`ml-auto ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
     </div>
