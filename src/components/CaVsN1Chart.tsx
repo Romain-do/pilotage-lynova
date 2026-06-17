@@ -32,7 +32,7 @@ export function CaVsN1Chart({
       role="group"
       aria-label={`${unitLabel} mensuel, exercice ${fy} (${euro(sum(current))}) vs exercice ${fy - 1} (${euro(sum(previous))}), axe octobre à septembre.`}
     >
-      <div className="flex h-44 items-end gap-1 sm:gap-1.5">
+      <div className="flex h-48 items-end gap-1 sm:gap-1.5">
         {FISCAL_MONTHS.map((label, i) => {
           const active = sel === null || sel === i;
           return (

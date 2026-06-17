@@ -1,7 +1,8 @@
 import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
 import { euro, rel, pct1 } from "@/lib/facturation";
+import { InfoTip } from "@/components/InfoTip";
 
-// Carte « Versé à Leaya » (style maison Leaya, tokens @theme). Partagée Cockpit + Trésorerie.
+// Carte « Leaya » (style maison Leaya, tokens @theme). Partagée Evoliz + Trésorerie.
 // ttc = total versé sur la période ; HT = ttc / 1,2 (TVA 20 %). Badge Vs N-1 si pertinent.
 export function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
   const ht = ttc / 1.2;
@@ -9,8 +10,13 @@ export function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
   return (
     <div className="group rounded-card border border-leaya-border bg-leaya p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
       <div className="flex h-8 items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-leaya-gold">Versé à</span>
         <span className="font-serif text-lg italic leading-none text-leaya-gold">Leaya</span>
+        <span className="flex-none text-leaya-gold">
+          <InfoTip label="Détail : Leaya">
+            <span className="block">Total versé à Leaya sur la période (TTC) — décaissements Revolut dont le bénéficiaire est Leaya.</span>
+            <span className="mt-1 block">HT = TTC ÷ 1,2 (TVA 20 %).</span>
+          </InfoTip>
+        </span>
       </div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
         <span className="text-2xl font-semibold leading-none text-leaya-ink">{euro(ttc)}</span>

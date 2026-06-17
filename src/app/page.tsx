@@ -9,6 +9,7 @@ import {
   fyOf,
   fyRange,
   fyLabel,
+  listFiscalYears,
   shiftYear,
   presetRange,
   rel,
@@ -27,7 +28,7 @@ import {
   horsExploitationByMonth,
   seriesForRange,
   earliestOutflowDate,
-  leayaInRange,
+  etatInRange,
 } from "@/lib/tresorerie";
 import { categoryOf, reminderStatus, formatDateFR, type KpiCategory } from "@/lib/prospection";
 import { Cockpit, type CockpitData } from "./Cockpit";
@@ -38,14 +39,25 @@ export const dynamic = "force-dynamic";
 // La synchro manuelle (refreshAll) s'exécute dans cette route → marge anti-timeout.
 export const maxDuration = 60;
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   if (!isSupabaseConfigured()) return <NotConfigured />;
 
   // Contrôle serveur (§3) — le middleware protège déjà, mais jamais que l'UI.
   const user = await requireUser();
   if (user.role !== "DIRIGEANT") redirect("/prospection");
 
-  const data = await buildCockpitData();
+  // Sélecteur d'exercice global (LOT 4) : ?fy=YYYY pilote tous les indicateurs périodiques.
+  // Valeur brute (string|string[]) → number ou undefined ; la validation finale (exercice connu)
+  // est faite dans buildCockpitData, qui retombe sur l'exercice en cours si absent/invalide.
+  const fyRaw = (await searchParams).fy;
+  const fyParam = Number(Array.isArray(fyRaw) ? fyRaw[0] : fyRaw);
+  const requestedFy = Number.isFinite(fyParam) ? fyParam : undefined;
+
+  const data = await buildCockpitData(requestedFy);
   const todayISO = new Date().toISOString().slice(0, 10);
   const dateLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -59,7 +71,7 @@ export default async function Home() {
 
 const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
 
-async function buildCockpitData(): Promise<CockpitData> {
+async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
   const todayISO = new Date().toISOString().slice(0, 10);
 
   const [docs, buysData, treso, rows, lastSync, freshness] = await Promise.all([
@@ -73,8 +85,15 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   const buys = buysData.buys;
 
-  // ── Finances : exercice en cours vs N-1 (définitions identiques à Facturation) ──
-  const fy = fyOf(todayISO);
+  // ── Exercice sélectionné (LOT 4) ──
+  // Liste des exercices avec facturation (desc), exercice en cours garanti présent. L'exercice
+  // demandé n'est retenu que s'il existe dans la liste, sinon retour à l'exercice en cours.
+  const currentFy = fyOf(todayISO);
+  const fyList = [...new Set([currentFy, ...listFiscalYears(docs)])].sort((a, b) => b - a);
+  const fy = requestedFy != null && fyList.includes(requestedFy) ? requestedFy : currentFy;
+  const isCurrentFy = fy === currentFy;
+
+  // ── Finances : exercice sélectionné vs N-1 (définitions identiques à Facturation) ──
   const range = fyRange(fy, todayISO);
   const prevRange = shiftYear(range);
   const cur = computeRange(docs, buys, range, "all");
@@ -86,7 +105,7 @@ async function buildCockpitData(): Promise<CockpitData> {
   const hasBankPrev = bankStart != null && prevRange.end >= bankStart;
   const net = netChargesInRange(treso.outflows, range);
   const netPrev = netChargesInRange(treso.outflows, prevRange);
-  // Marge nette = CA HT − charges Revolut (hors deny-list TVA/IS). Marge commerciale (cur.marge) séparée.
+  // Marge nette = CA HT − charges Revolut (hors deny-list TVA/IS). Marge brute (cur.marge) séparée.
   const margeNette = cur.caHtTotal - net.total;
   const margeNettePrev = prev.caHtTotal - netPrev.total;
   // Rémunération versée (catégorie Revolut « Rémunération ») sur l'exercice à date, vs N-1 même fenêtre.
@@ -95,8 +114,9 @@ async function buildCockpitData(): Promise<CockpitData> {
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
   const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
   const mrr = computeMRR(docs, range);
-  const leaya = leayaInRange(treso.outflows, range);
-  const leayaPrev = leayaInRange(treso.outflows, prevRange);
+  // « Versé à l'État » = TVA + charges sociales (URSSAF) + IS sur l'exercice, vs N-1 même fenêtre.
+  const etat = etatInRange(treso.outflows, range);
+  const etatPrev = etatInRange(treso.outflows, prevRange);
   // CA HT mensuel exercice vs N-1 (axe fiscal oct→sept).
   const caFyCur = caHtByFiscalMonth(docs, fy);
   const caFyPrev = caHtByFiscalMonth(docs, fy - 1);
@@ -116,16 +136,16 @@ async function buildCockpitData(): Promise<CockpitData> {
     horsExploit,
   };
 
-  // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
+  // ── Trésorerie : soldes INSTANTANÉS (ne suivent pas l'exercice sélectionné) ──
   const fiatEur = treso.accounts.filter((a) => a.kind === "FIAT").reduce((s, a) => s + (a.valoEur ?? 0), 0);
   const cryptoEur = treso.accounts.filter((a) => a.kind === "CRYPTO").reduce((s, a) => s + (a.valoEur ?? 0), 0);
-  const monthRange = presetRange("current-month", todayISO);
-  const monthPrev = shiftYear(monthRange);
-  const cashNetMonth = flowsInRange(treso.months, monthRange).net;
-  const cashNetMonthPrev = flowsInRange(treso.months, monthPrev).net;
-  const hasBankMonthPrev = bankStart != null && monthPrev.end >= bankStart;
 
-  const monthLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  // Cash net — CARTE : flux net cumulé sur l'exercice sélectionné, vs N-1 (suit le sélecteur, LOT 4).
+  const cashNetFy = flowsInRange(treso.months, range).net;
+  const cashNetFyPrev = flowsInRange(treso.months, prevRange).net;
+
+  // Cash net du MOIS COURANT — uniquement pour l'alerte « cash net négatif ce mois » (instantané).
+  const cashNetMonth = flowsInRange(treso.months, presetRange("current-month", todayISO)).net;
 
   // ── Prospection (définitions identiques à la liste) — `rows` = getCockpitProspection() ──
   const counts: Record<KpiCategory, number> = { a_rencontrer: 0, rencontres: 0, a_installer: 0, installes: 0, refus: 0 };
@@ -158,13 +178,13 @@ async function buildCockpitData(): Promise<CockpitData> {
   }));
 
   // ── Actions prioritaires (déduites des données) ──
+  // « Factures impayées » et « Prospects à rencontrer » sont remontés en cartes compactes dans
+  // l'en-tête (LOT 1) — ils ne figurent donc plus dans la liste d'alertes ci-dessous.
   const unpaidTtc = docs.reduce((s, d) => s + (d.kind === "INVOICE" ? d.netToPay : 0), 0);
   const alerts: CockpitData["alerts"] = [];
   if (cashNetMonth < 0) alerts.push({ tone: "danger", text: `Cash net négatif ce mois (${euro(cashNetMonth)})`, href: "/tresorerie" });
   if (overdue.length > 0) alerts.push({ tone: "warn", text: `${overdue.length} prospect${overdue.length > 1 ? "s" : ""} à recontacter (rappel échu)`, href: "/prospection" });
-  if (unpaidTtc >= 1) alerts.push({ tone: "warn", text: `${euro(unpaidTtc)} de factures impayées (restant dû)`, href: "/facturation" });
   if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${pct1(mrr.pct)} %)`, href: "/facturation" });
-  if (counts.a_rencontrer > 0) alerts.push({ tone: "info", text: `${counts.a_rencontrer} prospect${counts.a_rencontrer > 1 ? "s" : ""} à rencontrer`, href: "/prospection" });
 
   // Aucune donnée d'aucune source (cache vide, avant toute synchro) → état vide dédié au Cockpit,
   // au lieu d'afficher des « 0 € » partout qui ressembleraient à de vraies valeurs.
@@ -173,18 +193,22 @@ async function buildCockpitData(): Promise<CockpitData> {
   return {
     fyLabel: fyLabel(fy),
     fy,
+    currentFy,
+    isCurrentFy,
+    fyList,
     isEmpty,
     lastSync,
     freshness,
     // Mention « partiellement à jour » pour les indicateurs composites (Evoliz × Revolut) si une
     // source est périmée — seulement quand la marge nette est effectivement affichée (hasBank).
     staleNote: hasBank ? (staleSourcesLabel(freshness) ? `Partiellement à jour — ${staleSourcesLabel(freshness)}` : undefined) : undefined,
-    leaya,
-    leayaPrev,
+    // total + total N-1 (la carte calcule le delta neutre) + 3 composantes affichées en clair.
+    etat: { total: etat.total, totalPrev: etatPrev.total, tva: etat.tva, social: etat.social, is: etat.is },
     caFyCur,
     caFyPrev,
     tresoSeries,
     caVsCharges,
+    net,
     bankStart,
     finance: {
       caHt: cur.caHtTotal,
@@ -204,9 +228,10 @@ async function buildCockpitData(): Promise<CockpitData> {
       tresoTotal: fiatEur + cryptoEur,
       fiatEur,
       cryptoEur,
-      cashNetMonth,
-      cashNetMonthDelta: hasBankMonthPrev ? rel(cashNetMonth, cashNetMonthPrev) : null,
-      monthLabel,
+      unpaidTtc,
+      // Cash net cumulé de l'exercice sélectionné — « n/a » avant les données bancaires (hasBank).
+      cashNetFy,
+      cashNetFyDelta: hasBank && hasBankPrev ? rel(cashNetFy, cashNetFyPrev) : null,
     },
     prospection: {
       totalProspects: rows.length,
