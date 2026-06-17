@@ -16,6 +16,7 @@ import {
   formatDateFR,
   computeRange,
   computeMRR,
+  mrrByMonth,
   computeClients,
   computeBuyCategories,
   categoryDetail,
@@ -43,6 +44,7 @@ import { MargeNetteCard } from "@/components/MargeNetteCard";
 import { LeayaCard } from "@/components/LeayaCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend } from "@/components/CaVsChargesChart";
+import { TresoAreaChart } from "@/components/TresoAreaChart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { InfoTip } from "@/components/InfoTip";
 
@@ -93,6 +95,15 @@ export function Facturation({
     [docs, buys, range, filter]
   );
   const mrr = useMemo(() => computeMRR(docs, range), [docs, range]);
+  // Série « Évolution du MRR » (niveau mensuel) + courbe N-1 — réutilise TresoAreaChart (endBalance).
+  const mrrSeries = useMemo(
+    () => mrrByMonth(docs, range).map((m) => ({ key: m.key, label: m.label, inflow: 0, outflow: 0, endBalance: m.mrr })),
+    [docs, range]
+  );
+  const mrrSeriesPrev = useMemo(
+    () => mrrByMonth(docs, shiftYear(range)).map((m) => ({ key: m.key, label: m.label, inflow: 0, outflow: 0, endBalance: m.mrr })),
+    [docs, range]
+  );
   const clients = useMemo(() => computeClients(docs, range), [docs, range]);
   const cats = useMemo(() => computeBuyCategories(buyItems, range), [buyItems, range]);
   // Charges Revolut ventilées par catégorie & par mois civil (alignées sur cur.months) pour la
@@ -159,14 +170,15 @@ export function Facturation({
 
       {/* ───────── KPI principaux ───────── */}
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} foot={`⌀ ${euro(cur.caHt / months)}/mois`}
+        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} valueRaw={cur.caHt} valuePrev={prev.caHt} avgFoot={`⌀ ${euro(cur.caHt / months)}/mois`}
           info="Chiffre d'affaires hors taxes : somme des factures validées de la période. ⌀/mois = CA HT ÷ nombre de mois." />
-        <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge brute" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)}
+        <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge brute" value={euro(cur.marge)} valueRaw={cur.marge} valuePrev={prev.marge}
           info="Marge brute = CA HT − achats fournisseurs (Evoliz)." />
         {/* Marge nette + taux de marge nette fusionnés dans une seule carte. */}
         <MargeNetteCard
           hasBank={hasBank}
           value={margeNette}
+          valuePrev={margeNettePrev}
           delta={hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null}
           caHtTotal={cur.caHtTotal}
           net={netCur}
@@ -174,15 +186,15 @@ export function Facturation({
           tauxDeltaPts={tauxNetteDeltaPts}
           staleNote={staleNote}
         />
-        <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct}
-          info="Revenu mensuel récurrent : montant HT des abonnements facturés sur le dernier mois de la période." />
+        <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} valueRaw={mrr.mrr} valuePrev={mrr.prev}
+          info="Revenu mensuel récurrent : montant HT des abonnements facturés sur le dernier mois de la période. Comparé au même mois N-1." />
       </div>
 
       {/* ───────── Stats secondaires (même gabarit KpiCard, comparaison N-1) ───────── */}
       <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats HT" value={euro(cur.achatsHt)} delta={rel(cur.achatsHt, prev.achatsHt)} positiveIsGood={false} foot={`⌀ ${euro(achatsAvg)}/mois`}
+        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats HT" value={euro(cur.achatsHt)} valueRaw={cur.achatsHt} valuePrev={prev.achatsHt} positiveIsGood={false} avgFoot={`⌀ ${euro(achatsAvg)}/mois`}
           info="Total des achats fournisseurs (Evoliz) en HT sur la période. ⌀/mois = achats ÷ nombre de mois." />
-        <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)}
+        <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} valueRaw={cur.encaisseTtc} valuePrev={prev.encaisseTtc}
           info="Montant TTC déjà encaissé sur les factures de la période." />
         <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1"
           info="Montant TTC restant à encaisser sur les factures de la période (solde instantané, sans comparaison N-1)." />
@@ -224,7 +236,7 @@ export function Facturation({
               <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {fyNow} vs {fyNow - 1}</h2>
               <div className="flex items-center gap-3 text-xs text-ink-2">
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
-                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
+                <span className="inline-flex items-center gap-1.5 text-n1-text"><span className="h-2.5 w-2.5 rounded-sm bg-n1" /> Exercice {fyNow - 1}</span>
               </div>
             </div>
             <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
@@ -232,6 +244,14 @@ export function Facturation({
         </div>
 
         <SynthBlock stats={cur} />
+      </div>
+
+      {/* ───────── Évolution du MRR — niveau mensuel (abonnements facturés) ───────── */}
+      <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
+        <h2 className="text-sm font-semibold text-ink">Évolution du MRR</h2>
+        <p className="text-xs text-ink-3">Abonnements facturés · fin de mois · {rangeLabel(range)}</p>
+        <TresoAreaChart series={mrrSeries} compare={mrrSeriesPrev.some((s) => s.endBalance > 0) ? mrrSeriesPrev : undefined}
+          title="Évolution du MRR" valueLabel="MRR" deltaInTooltip />
       </div>
 
       {/* « Évolution rémunération » retirée d'Evoliz (donnée bancaire) → visible sur Revolut + Cockpit. */}
@@ -436,7 +456,7 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
           <span className="ml-auto font-semibold tabular-nums text-ink">{euro(stats.caHtTotal)}</span>
         </div>
         <div className="space-y-2 border-t border-line pt-2">
-          <LegRow color="bg-amber-400" label="Achats" value={euro(stats.achatsHt)} />
+          <LegRow color="bg-cat" label="Achats" value={euro(stats.achatsHt)} />
           <LegRow color="bg-emerald-500" label="Marge" value={euro(stats.marge)} strong />
         </div>
       </div>
@@ -536,7 +556,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: CatRow[]; onPick: (c: CatRo
               <span className="flex-none font-medium text-ink">{euro(c.ht)} <span className="font-normal text-ink-3">· {pct1(pct)} %</span></span>
             </div>
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
-              <div className={`h-full rounded-full transition-all duration-500 ${isSans ? "bg-navy/30" : "bg-amber-400"}`} style={{ width: `${Math.max(2, (c.ht / max) * 100)}%` }} />
+              <div className={`h-full rounded-full transition-all duration-500 ${isSans ? "bg-navy/30" : "bg-cat"}`} style={{ width: `${Math.max(2, (c.ht / max) * 100)}%` }} />
             </div>
           </button>
         );

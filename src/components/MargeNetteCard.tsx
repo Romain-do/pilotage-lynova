@@ -18,6 +18,7 @@ import type { RevolutCharges } from "@/lib/tresorerie";
 export function MargeNetteCard({
   hasBank,
   value,
+  valuePrev,
   delta,
   caHtTotal,
   net,
@@ -27,6 +28,7 @@ export function MargeNetteCard({
 }: {
   hasBank: boolean;
   value: number;
+  valuePrev: number;
   delta: number | null;
   caHtTotal: number;
   net: RevolutCharges;
@@ -34,6 +36,8 @@ export function MargeNetteCard({
   tauxDeltaPts: number | null;
   staleNote?: string;
 }) {
+  // Delta € vs N-1 (le delta % est fourni par `delta`, déjà garde-fou hasBank/hasBankPrev).
+  const dEur = value - valuePrev;
   // Détail accessible souris (group-hover), tactile & clavier (toggle `open` + ×).
   const [open, setOpen] = useState(false);
   // Ventilation arrondie par apportionnement → CA HT − Σ postes == marge nette affichée (tombe juste).
@@ -57,17 +61,20 @@ export function MargeNetteCard({
       {hasBank ? (
         <>
           <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{euro(value)}</div>
-          <div className="mt-1.5 min-h-4 text-xs">
+          <div className="mt-1.5 min-h-4 space-y-1 text-xs">
             {delta == null ? (
               <span className="text-ink-3">Vs N-1 : —</span>
             ) : (
-              <span className="inline-flex items-center gap-1">
-                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                  {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-                  {pct1(Math.abs(delta))} %
+              <>
+                <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                    {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
+                    {pct1(Math.abs(delta))} %
+                  </span>
+                  <span className="font-medium text-ink-2">{dEur >= 0 ? "+" : "−"}{euro(Math.abs(dEur))}</span>
                 </span>
-                <span className="text-ink-3">Vs N-1</span>
-              </span>
+                <div className="font-medium text-n1-text">N-1 {euro(valuePrev)}</div>
+              </>
             )}
           </div>
 

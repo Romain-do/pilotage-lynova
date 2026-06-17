@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import {
   computeRange,
   computeMRR,
+  mrrByMonth,
+  monthCa,
+  monthLabelShort,
   fyOf,
   fyRange,
   fyLabel,
@@ -30,6 +33,7 @@ import {
   earliestOutflowDate,
   etatInRange,
 } from "@/lib/tresorerie";
+import { runRateBasis } from "@/lib/projections";
 import { categoryOf, reminderStatus, formatDateFR, type KpiCategory } from "@/lib/prospection";
 import { Cockpit, type CockpitData } from "./Cockpit";
 
@@ -124,6 +128,60 @@ async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
   // Évolution de la trésorerie : solde fin de mois sur l'exercice en cours (même période que les
   // autres graphes du Cockpit).
   const tresoSeries = seriesForRange(treso.months, range);
+  // Courbe N-1 trésorerie (exercice précédent, même fenêtre fiscale décalée d'un an). Les mois
+  // antérieurs au 1er mois de données bancaires sont marqués `missing` → la courbe N-1 est
+  // INTERROMPUE sur ces mois (pas de chute artificielle à 0).
+  const firstDataMonth = treso.months.reduce<string | null>((min, m) => (min == null || m.key < min ? m.key : min), null);
+  const tresoSeriesPrev = seriesForRange(treso.months, prevRange).map((p) => ({
+    ...p,
+    missing: firstDataMonth == null || p.key < firstDataMonth,
+  }));
+  // Évolution du MRR : niveau mensuel (abonnements facturés) sur l'exercice + courbe N-1. Réutilise
+  // le gabarit TresoAreaChart → la métrique est portée par `endBalance`.
+  const toMrrPoint = (m: { key: string; label: string; mrr: number }) => ({ key: m.key, label: m.label, inflow: 0, outflow: 0, endBalance: m.mrr });
+  const mrrSeries = mrrByMonth(docs, range).map(toMrrPoint);
+  const mrrSeriesPrev = mrrByMonth(docs, prevRange).map(toMrrPoint);
+
+  // ── Projections (exercice EN COURS uniquement) ──────────────────────────────────────────────
+  // A · CA HT projeté : base (mois complets) + scénario mensuel × rem. Quasi certain = MRR acquis ;
+  //   Potentiel = run-rate CA HT 6 mois glissants. B · prolongement du solde fiat EUR (cash net moyen).
+  const earliestInvoiceMonth = docs.reduce<string | null>(
+    (min, d) => (d.kind === "INVOICE" && (min == null || d.date.slice(0, 7) < min) ? d.date.slice(0, 7) : min),
+    null,
+  );
+  const caBasis = isCurrentFy ? runRateBasis(fy, todayISO, (k) => monthCa(docs, k), earliestInvoiceMonth) : null;
+  const caProjection =
+    caBasis && caBasis.rem > 0 && caBasis.monthsUsed >= 1
+      ? {
+          // base = réalisé à date (mois courant inclus) ; rem = mois pleins restants (juil→sept).
+          base: caBasis.base,
+          rem: caBasis.rem,
+          quasiCertain: caBasis.base + mrr.mrr * caBasis.rem,
+          potentiel: caBasis.base + caBasis.runRate * caBasis.rem,
+          monthsUsed: caBasis.monthsUsed,
+          fewMonths: caBasis.fewMonths,
+          hasMrr: mrr.mrr > 0,
+        }
+      : null;
+
+  // Prolongement de la courbe trésorerie en FOURCHETTE : le cash futur = CA HT projeté × taux de marge
+  // nette de l'exercice (`tauxNetRatio` = margeNette / CA HT). À partir du dernier solde réel, un point
+  // par mois fiscal restant (jusqu'à sept.) :
+  //   • quasi certaine (borne basse) = solde + (MRR × tauxNet) × k ;
+  //   • potentielle    (borne haute) = solde + (runRate CA × tauxNet) × k.
+  // Garde-fou : pas de données bancaires (hasBank faux) → pas de projection. Si tauxNet ≤ 0, on projette
+  // quand même (courbe descendante honnête) — signalé dans la note. Bornage low=min / high=max.
+  const tauxNetRatio = hasBank && cur.caHtTotal > 0 ? margeNette / cur.caHtTotal : null;
+  const lastBal = tresoSeries.length ? tresoSeries[tresoSeries.length - 1].endBalance : 0;
+  const tresoProjection =
+    caBasis && hasBank && tauxNetRatio != null && caBasis.monthsUsed >= 1 && caBasis.futureMonths.length > 0
+      ? caBasis.futureMonths.map((mk, j) => {
+          const k = j + 1;
+          const quasiVal = lastBal + mrr.mrr * tauxNetRatio * k; // CA récurrent (MRR) × marge nette
+          const potentielVal = lastBal + caBasis.runRate * tauxNetRatio * k; // CA run-rate × marge nette
+          return { label: monthLabelShort(mk), low: Math.min(quasiVal, potentielVal), high: Math.max(quasiVal, potentielVal) };
+        })
+      : [];
   // CA vs charges — mensuel HT (exercice en cours). Mêmes charges que la marge nette ⇒ cohérence.
   const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months, range);
   // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
@@ -207,22 +265,31 @@ async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
     caFyCur,
     caFyPrev,
     tresoSeries,
+    tresoSeriesPrev,
+    tresoProjection,
+    mrrSeries,
+    mrrSeriesPrev,
+    caProjection,
     caVsCharges,
     net,
     bankStart,
     finance: {
       caHt: cur.caHtTotal,
+      caHtPrev: prev.caHtTotal,
       caHtAvg: cur.caHtTotal / nMonths,
       caDelta: rel(cur.caHtTotal, prev.caHtTotal),
       margeNette,
+      margeNettePrev,
       margeNetteDelta: hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null,
       remu,
+      remuPrev,
       remuAvg: remu / nMonths,
       remuDelta: hasBank && hasBankPrev ? rel(remu, remuPrev) : null,
       hasBank,
       tauxNette,
       tauxNetteDeltaPts: hasBank && hasBankPrev && tauxNette != null && tauxNettePrev != null ? tauxNette - tauxNettePrev : null,
       mrr: mrr.mrr,
+      mrrPrev: mrr.prev,
       mrrDelta: mrr.pct,
       mrrLabel: mrr.monthLabel,
       tresoTotal: fiatEur + cryptoEur,
@@ -231,6 +298,7 @@ async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
       unpaidTtc,
       // Cash net cumulé de l'exercice sélectionné — « n/a » avant les données bancaires (hasBank).
       cashNetFy,
+      cashNetFyPrev,
       cashNetFyDelta: hasBank && hasBankPrev ? rel(cashNetFy, cashNetFyPrev) : null,
     },
     prospection: {

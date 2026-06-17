@@ -73,6 +73,15 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
   }, [period, todayISO]);
 
   const series = useMemo(() => seriesForRange(data.months, range), [data.months, range]);
+  // Courbe N-1 (même fenêtre décalée d'un an). Mois antérieurs au 1er mois de données bancaires →
+  // `missing` (courbe interrompue, pas de chute artificielle à 0).
+  const seriesPrev = useMemo(() => {
+    const firstDataMonth = data.months.reduce<string | null>((min, m) => (min == null || m.key < min ? m.key : min), null);
+    return seriesForRange(data.months, shiftYear(range)).map((p) => ({
+      ...p,
+      missing: firstDataMonth == null || p.key < firstDataMonth,
+    }));
+  }, [data.months, range]);
   const flows = useMemo(() => flowsInRange(data.months, range), [data.months, range]);
   const flowsPrev = useMemo(() => flowsInRange(data.months, shiftYear(range)), [data.months, range]);
   const cats = useMemo(() => categoriesInRange(data.outflows, range), [data.outflows, range]);
@@ -162,7 +171,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
             )
           } />
         <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Cash net de la période"
-          value={euro(flows.net)} delta={flowsPrev.net !== 0 ? rel(flows.net, flowsPrev.net) : null}
+          value={euro(flows.net)} valueRaw={flows.net} valuePrev={flowsPrev.net}
           foot={`entrées ${euro(flows.inflow)} · sorties ${euro(flows.outflow)}`}
           info="Flux net de la période : encaissements − décaissements externes (hors virements internes et crypto)." />
         <LeayaCard ttc={leaya} ttcPrev={leayaPrev} />
@@ -174,7 +183,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
           <div className="rounded-card border border-line bg-white p-4 shadow-card">
             <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
             <p className="text-xs text-ink-3">Solde EUR fin de mois · {rangeLabel(range)}</p>
-            <TresoAreaChart series={series} />
+            <TresoAreaChart series={series} compare={seriesPrev} />
           </div>
           {/* Graphe 2 — Flux nets mensuels */}
           <div className="rounded-card border border-line bg-white p-4 shadow-card">
@@ -197,7 +206,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
           <h2 className="text-sm font-semibold text-ink">Évolution rémunération — exercice {fyNow} vs {fyNow - 1}</h2>
           <div className="flex items-center gap-3 text-xs text-ink-2">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
+            <span className="inline-flex items-center gap-1.5 text-n1-text"><span className="h-2.5 w-2.5 rounded-sm bg-n1" /> Exercice {fyNow - 1}</span>
           </div>
         </div>
         <p className="mt-0.5 text-xs text-ink-3">Décaissements catégorie « Rémunération » · axe oct. → sept.</p>
@@ -364,6 +373,8 @@ function CategoryBreakdown({ cats, onPick }: { cats: TCatRow[]; onPick: (c: TCat
     <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
       {top.map((c) => {
         const pct = total > 0 ? (c.amount / total) * 100 : 0;
+        // Le seau « sans libellé / sans catégorie » reste gris neutre (jamais violet).
+        const isNeutral = c.label === "(sans libellé)" || c.label === "(sans catégorie)";
         return (
           <button key={c.label} type="button" onClick={() => onPick(c)}
             className="block w-full rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-cyan/[0.06] focus:bg-cyan/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan">
@@ -372,7 +383,7 @@ function CategoryBreakdown({ cats, onPick }: { cats: TCatRow[]; onPick: (c: TCat
               <span className="flex-none font-medium text-ink">{euro(c.amount)} <span className="font-normal text-ink-3">· {pct1(pct)} %</span></span>
             </div>
             <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-cloud">
-              <div className="h-full rounded-full bg-amber-400 transition-all duration-500" style={{ width: `${Math.max(2, (c.amount / max) * 100)}%` }} />
+              <div className={`h-full rounded-full transition-all duration-500 ${isNeutral ? "bg-navy/30" : "bg-cat"}`} style={{ width: `${Math.max(2, (c.amount / max) * 100)}%` }} />
             </div>
           </button>
         );

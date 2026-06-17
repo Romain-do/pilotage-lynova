@@ -9,6 +9,9 @@
   --color-cyan: #6fd6f2; /* accent */
   --color-cyan-600: #0b7c9e; /* cyan foncé : texte/accents sur blanc */
   --color-cloud: #f6f8fb; /* fond app */
+  --color-n1: #f59e0b; /* jaune ambré (amber-500) — objets graphiques « N-1 » (barres, courbes, pastilles) */
+  --color-n1-text: #b45309; /* ambré foncé (amber-700) — texte « N-1 » sur fond blanc (contraste AA) */
+  --color-cat: #8b5cf6; /* violet (violet-500) — barres des listes « par catégorie » (distinct du jaune N-1) */
 
   /* Surfaces & lignes */
   --color-line: #e6eaf1; /* bordures douces */
