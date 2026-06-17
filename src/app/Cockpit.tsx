@@ -21,6 +21,7 @@ import { AppNav } from "@/components/AppNav";
 import { KpiCard } from "@/components/KpiCard";
 import { EtatCard } from "@/components/EtatCard";
 import { MargeNetteCard } from "@/components/MargeNetteCard";
+import { FySelect } from "@/components/FySelect";
 import type { RevolutCharges } from "@/lib/tresorerie";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, type ChargeSeries } from "@/components/CaVsChargesChart";
@@ -34,6 +35,10 @@ import type { Freshness } from "@/lib/sync-state";
 export interface CockpitData {
   fyLabel: string;
   fy: number;
+  // Sélecteur d'exercice (LOT 4) : exercice en cours, exercice sélectionné == en cours ?, liste.
+  currentFy: number;
+  isCurrentFy: boolean;
+  fyList: number[];
   // Cache vide (aucune source) → état vide dédié au lieu de « 0 € » partout.
   isEmpty: boolean;
   lastSync: string | null;
@@ -58,7 +63,7 @@ export interface CockpitData {
     tauxNette: number | null; tauxNetteDeltaPts: number | null;
     mrr: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
-    cashNetMonth: number; cashNetMonthDelta: number | null; monthLabel: string;
+    cashNetFy: number; cashNetFyDelta: number | null;
     unpaidTtc: number;
   };
   prospection: {
@@ -147,9 +152,11 @@ export function Cockpit({
           )}
         </div>
 
-        {/* Bloc Finances */}
+        {/* Bloc Finances — sélecteur d'exercice global (pilote les indicateurs périodiques + graphes) */}
         <div className="mt-6">
-          <div className="flex items-baseline justify-between">
+          {/* Sélecteur d'exercice sur sa propre ligne, au-dessus du titre « Finances ». */}
+          <FySelect fy={data.fy} currentFy={data.currentFy} fyList={data.fyList} />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-ink">Finances</h2>
             <span className="text-xs text-ink-3">{data.fyLabel} · comparé à N-1</span>
           </div>
@@ -170,11 +177,14 @@ export function Cockpit({
               staleNote={data.staleNote}
             />
             <KpiCard icon={<IconWallet size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Trésorerie totale"
+              badge={data.isCurrentFy ? undefined : "actuel"}
               value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`}
-              info="Valeur de tous les comptes : liquidités fiat (EUR + devises converties) + cryptos valorisées au cours Revolut. Solde instantané." />
-            <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · ${f.monthLabel}`}
-              value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta}
-              info="Flux net du mois : encaissements − décaissements externes (Revolut, hors virements internes et crypto)." />
+              info="Valeur de tous les comptes : liquidités fiat (EUR + devises converties) + cryptos valorisées au cours Revolut. Solde instantané (ne suit pas l'exercice sélectionné)." />
+            <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · exercice ${data.fy}`}
+              value={f.hasBank ? euro(f.cashNetFy) : "n/a"} muted={!f.hasBank}
+              delta={f.hasBank ? f.cashNetFyDelta : null}
+              foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"}
+              info="Flux net cumulé sur l'exercice sélectionné : encaissements − décaissements externes (hors virements internes et crypto)." />
             <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
               value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
               delta={f.hasBank ? f.remuDelta : null} deltaNeutral

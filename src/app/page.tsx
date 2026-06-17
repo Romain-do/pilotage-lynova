@@ -9,6 +9,7 @@ import {
   fyOf,
   fyRange,
   fyLabel,
+  listFiscalYears,
   shiftYear,
   presetRange,
   rel,
@@ -38,14 +39,25 @@ export const dynamic = "force-dynamic";
 // La synchro manuelle (refreshAll) s'exécute dans cette route → marge anti-timeout.
 export const maxDuration = 60;
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   if (!isSupabaseConfigured()) return <NotConfigured />;
 
   // Contrôle serveur (§3) — le middleware protège déjà, mais jamais que l'UI.
   const user = await requireUser();
   if (user.role !== "DIRIGEANT") redirect("/prospection");
 
-  const data = await buildCockpitData();
+  // Sélecteur d'exercice global (LOT 4) : ?fy=YYYY pilote tous les indicateurs périodiques.
+  // Valeur brute (string|string[]) → number ou undefined ; la validation finale (exercice connu)
+  // est faite dans buildCockpitData, qui retombe sur l'exercice en cours si absent/invalide.
+  const fyRaw = (await searchParams).fy;
+  const fyParam = Number(Array.isArray(fyRaw) ? fyRaw[0] : fyRaw);
+  const requestedFy = Number.isFinite(fyParam) ? fyParam : undefined;
+
+  const data = await buildCockpitData(requestedFy);
   const todayISO = new Date().toISOString().slice(0, 10);
   const dateLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", {
     weekday: "long",
@@ -59,7 +71,7 @@ export default async function Home() {
 
 const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);
 
-async function buildCockpitData(): Promise<CockpitData> {
+async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
   const todayISO = new Date().toISOString().slice(0, 10);
 
   const [docs, buysData, treso, rows, lastSync, freshness] = await Promise.all([
@@ -73,8 +85,15 @@ async function buildCockpitData(): Promise<CockpitData> {
 
   const buys = buysData.buys;
 
-  // ── Finances : exercice en cours vs N-1 (définitions identiques à Facturation) ──
-  const fy = fyOf(todayISO);
+  // ── Exercice sélectionné (LOT 4) ──
+  // Liste des exercices avec facturation (desc), exercice en cours garanti présent. L'exercice
+  // demandé n'est retenu que s'il existe dans la liste, sinon retour à l'exercice en cours.
+  const currentFy = fyOf(todayISO);
+  const fyList = [...new Set([currentFy, ...listFiscalYears(docs)])].sort((a, b) => b - a);
+  const fy = requestedFy != null && fyList.includes(requestedFy) ? requestedFy : currentFy;
+  const isCurrentFy = fy === currentFy;
+
+  // ── Finances : exercice sélectionné vs N-1 (définitions identiques à Facturation) ──
   const range = fyRange(fy, todayISO);
   const prevRange = shiftYear(range);
   const cur = computeRange(docs, buys, range, "all");
@@ -117,16 +136,16 @@ async function buildCockpitData(): Promise<CockpitData> {
     horsExploit,
   };
 
-  // ── Trésorerie (définitions identiques à la vue Trésorerie) ──
+  // ── Trésorerie : soldes INSTANTANÉS (ne suivent pas l'exercice sélectionné) ──
   const fiatEur = treso.accounts.filter((a) => a.kind === "FIAT").reduce((s, a) => s + (a.valoEur ?? 0), 0);
   const cryptoEur = treso.accounts.filter((a) => a.kind === "CRYPTO").reduce((s, a) => s + (a.valoEur ?? 0), 0);
-  const monthRange = presetRange("current-month", todayISO);
-  const monthPrev = shiftYear(monthRange);
-  const cashNetMonth = flowsInRange(treso.months, monthRange).net;
-  const cashNetMonthPrev = flowsInRange(treso.months, monthPrev).net;
-  const hasBankMonthPrev = bankStart != null && monthPrev.end >= bankStart;
 
-  const monthLabel = new Date(`${todayISO}T12:00:00`).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  // Cash net — CARTE : flux net cumulé sur l'exercice sélectionné, vs N-1 (suit le sélecteur, LOT 4).
+  const cashNetFy = flowsInRange(treso.months, range).net;
+  const cashNetFyPrev = flowsInRange(treso.months, prevRange).net;
+
+  // Cash net du MOIS COURANT — uniquement pour l'alerte « cash net négatif ce mois » (instantané).
+  const cashNetMonth = flowsInRange(treso.months, presetRange("current-month", todayISO)).net;
 
   // ── Prospection (définitions identiques à la liste) — `rows` = getCockpitProspection() ──
   const counts: Record<KpiCategory, number> = { a_rencontrer: 0, rencontres: 0, a_installer: 0, installes: 0, refus: 0 };
@@ -174,6 +193,9 @@ async function buildCockpitData(): Promise<CockpitData> {
   return {
     fyLabel: fyLabel(fy),
     fy,
+    currentFy,
+    isCurrentFy,
+    fyList,
     isEmpty,
     lastSync,
     freshness,
@@ -207,9 +229,9 @@ async function buildCockpitData(): Promise<CockpitData> {
       fiatEur,
       cryptoEur,
       unpaidTtc,
-      cashNetMonth,
-      cashNetMonthDelta: hasBankMonthPrev ? rel(cashNetMonth, cashNetMonthPrev) : null,
-      monthLabel,
+      // Cash net cumulé de l'exercice sélectionné — « n/a » avant les données bancaires (hasBank).
+      cashNetFy,
+      cashNetFyDelta: hasBank && hasBankPrev ? rel(cashNetFy, cashNetFyPrev) : null,
     },
     prospection: {
       totalProspects: rows.length,

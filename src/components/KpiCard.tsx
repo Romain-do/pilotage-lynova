@@ -15,7 +15,7 @@ import { pct1 } from "@/lib/facturation";
 // est périmée (ex. marge nette = Evoliz × Revolut) → ne pas présenter le chiffre comme fiable.
 // `info` (optionnel) : contenu d'une infobulle « ⓘ » à côté du label (détail technique déporté).
 export function KpiCard({
-  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false, staleNote, info,
+  icon, tint, label, value, delta, deltaUnit = "%", deltaLabel = "Vs N-1", muted = false, foot, positiveIsGood = true, deltaNeutral = false, staleNote, info, badge,
 }: {
   icon: ReactNode;
   tint: string;
@@ -30,6 +30,9 @@ export function KpiCard({
   deltaNeutral?: boolean;
   staleNote?: string;
   info?: ReactNode;
+  // Pastille discrète à droite du label (ex. « actuel » pour un indicateur instantané affiché
+  // alors qu'un exercice passé est sélectionné).
+  badge?: ReactNode;
 }) {
   const isGood = delta != null && (positiveIsGood ? delta >= 0 : delta <= 0);
   const badgeClass = deltaNeutral
@@ -40,6 +43,7 @@ export function KpiCard({
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
         <span className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
+        {badge && <span className="flex-none rounded-full bg-cloud px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-3">{badge}</span>}
         {info && <span className="flex-none"><InfoTip label={`Détail : ${label}`}>{info}</InfoTip></span>}
       </div>
       <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
