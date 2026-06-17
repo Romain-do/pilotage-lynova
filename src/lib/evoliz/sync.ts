@@ -245,7 +245,7 @@ export async function syncEvoliz(prisma: PrismaClient): Promise<EvolizSyncSummar
   return summary;
 }
 
-// ───────────────────────── Achats (marge commerciale) ─────────────────────────
+// ───────────────────────── Achats (marge brute) ─────────────────────────
 
 export interface BuysSyncSummary {
   buys: number;

@@ -1,6 +1,6 @@
 // Logique métier Facturation (§5) — basée sur une PLAGE DE DATES [start, end].
 // CA en HT brut (factures validées, avoirs non déduits) ; abonnement < 2000 € /
-// installation ≥ 2000 € ; marge commerciale = CA HT − achats fournisseurs HT ;
+// installation ≥ 2000 € ; marge brute = CA HT − achats fournisseurs HT ;
 // HT/TTC stricts. Comparaison N-1 = même plage décalée d'un an.
 // Les dates sont des chaînes ISO `yyyy-mm-dd` (comparaison lexicographique = chronologique).
 

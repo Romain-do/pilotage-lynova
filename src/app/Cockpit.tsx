@@ -3,9 +3,7 @@
 import Link from "next/link";
 import {
   IconCoin,
-  IconReportMoney,
   IconPigMoney,
-  IconPercentage,
   IconRepeat,
   IconWallet,
   IconArrowsExchange,
@@ -16,10 +14,14 @@ import {
   IconAlertTriangle,
   IconChevronRight,
   IconExternalLink,
+  IconFileInvoice,
 } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 import { AppNav } from "@/components/AppNav";
 import { KpiCard } from "@/components/KpiCard";
-import { LeayaCard } from "@/components/LeayaCard";
+import { EtatCard } from "@/components/EtatCard";
+import { MargeNetteCard } from "@/components/MargeNetteCard";
+import type { RevolutCharges } from "@/lib/tresorerie";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
 import { CaVsChargesChart, ChargesLegend, type ChargeSeries } from "@/components/CaVsChargesChart";
 import { TresoAreaChart, type SeriePoint } from "@/components/TresoAreaChart";
@@ -38,14 +40,16 @@ export interface CockpitData {
   // Fraîcheur par source (Evoliz / Revolut) + mention « partiellement à jour » pour les composites.
   freshness: Freshness;
   staleNote?: string;
-  leaya: number;
-  leayaPrev: number;
+  // « Versé à l'État » = TVA + charges sociales (URSSAF) + IS sur l'exercice (delta neutre vs N-1).
+  etat: { total: number; totalPrev: number; tva: number; social: number; is: number };
   caFyCur: number[];
   caFyPrev: number[];
   // Évolution de la trésorerie (solde fin de mois, 12 derniers mois) — réutilise TresoAreaChart.
   tresoSeries: SeriePoint[];
   // CA vs charges mensuel HT (exercice en cours) — réutilise CaVsChargesChart.
   caVsCharges: ChargeSeries;
+  // Charges Revolut de l'exercice (total + ventilation par catégorie) — détail de la marge nette.
+  net: RevolutCharges;
   bankStart: string | null;
   finance: {
     caHt: number; caHtAvg: number; caDelta: number | null;
@@ -55,6 +59,7 @@ export interface CockpitData {
     mrr: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
     cashNetMonth: number; cashNetMonthDelta: number | null; monthLabel: string;
+    unpaidTtc: number;
   };
   prospection: {
     totalProspects: number;
@@ -98,13 +103,23 @@ export function Cockpit({
       <AppNav role={user.role} />
 
       <section className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
-        {/* Salutation + actualiser */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+        {/* Salutation + actions prioritaires compactes + actualiser */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-none">
             <h1 className="text-2xl font-semibold text-ink">Bonjour {firstName}</h1>
             <p className="mt-1 text-sm capitalize text-ink-3">{dateLabel}</p>
           </div>
-          <RefreshButton initialLastSync={data.lastSync} freshness={data.freshness} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            {!data.isEmpty && (
+              <div className="grid grid-cols-2 gap-2.5 sm:flex">
+                <HeaderAction href="/facturation" tint="bg-amber-50 text-amber-600"
+                  icon={<IconFileInvoice size={18} stroke={2} />} label="Factures impayées" value={euro(f.unpaidTtc)} />
+                <HeaderAction href="/prospection" tint="bg-sky-50 text-sky-600"
+                  icon={<IconCalendarEvent size={18} stroke={2} />} label="À rencontrer" value={String(p.aRencontrer)} />
+              </div>
+            )}
+            <RefreshButton initialLastSync={data.lastSync} freshness={data.freshness} />
+          </div>
         </div>
 
         {data.isEmpty ? (
@@ -141,26 +156,37 @@ export function Cockpit({
           <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {/* Essentiels en tête : CA HT · Marge nette · Trésorerie · Cash net */}
             <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA HT"
-              value={euro(f.caHt)} delta={f.caDelta} foot={`⌀ ${euro(f.caHtAvg)}/mois`} />
-            <KpiCard icon={<IconReportMoney size={18} stroke={2} />} tint="bg-violet-50 text-violet-600" label="Marge nette (approchée)"
-              value={f.hasBank ? euro(f.margeNette) : "n/a"} muted={!f.hasBank}
-              delta={f.hasBank ? f.margeNetteDelta : null} staleNote={data.staleNote}
-              foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
+              value={euro(f.caHt)} delta={f.caDelta} foot={`⌀ ${euro(f.caHtAvg)}/mois`}
+              info="Chiffre d'affaires hors taxes : somme des factures validées sur l'exercice. ⌀/mois = CA HT ÷ nombre de mois écoulés." />
+            {/* Marge nette + taux de marge nette fusionnés dans une seule carte. */}
+            <MargeNetteCard
+              hasBank={f.hasBank}
+              value={f.margeNette}
+              delta={f.margeNetteDelta}
+              caHtTotal={f.caHt}
+              net={data.net}
+              taux={f.tauxNette}
+              tauxDeltaPts={f.tauxNetteDeltaPts}
+              staleNote={data.staleNote}
+            />
             <KpiCard icon={<IconWallet size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Trésorerie totale"
-              value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`} />
+              value={euro(f.tresoTotal)} foot={`fiat ${euro(f.fiatEur)} · crypto ${euro(f.cryptoEur)}`}
+              info="Valeur de tous les comptes : liquidités fiat (EUR + devises converties) + cryptos valorisées au cours Revolut. Solde instantané." />
             <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · ${f.monthLabel}`}
-              value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta} />
+              value={euro(f.cashNetMonth)} delta={f.cashNetMonthDelta}
+              info="Flux net du mois : encaissements − décaissements externes (Revolut, hors virements internes et crypto)." />
             <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
               value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
               delta={f.hasBank ? f.remuDelta : null} deltaNeutral
-              foot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : "pas de données bancaires avant nov. 2024"} />
-            <KpiCard icon={<IconPercentage size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Taux de marge nette"
-              value={f.hasBank && f.tauxNette != null ? `${pct1(f.tauxNette)} %` : "n/a"} muted={!f.hasBank}
-              delta={f.tauxNetteDeltaPts} deltaUnit="pts" staleNote={data.staleNote}
-              foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
+              foot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : "pas de données bancaires avant nov. 2024"}
+              info="Total versé au dirigeant sur l'exercice : décaissements Revolut catégorisés « Rémunération »." />
             <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${f.mrrLabel ?? "—"}`}
-              value={euro(f.mrr)} delta={f.mrrDelta} />
-            <LeayaCard ttc={data.leaya} ttcPrev={data.leayaPrev} />
+              value={euro(f.mrr)} delta={f.mrrDelta}
+              info="Revenu mensuel récurrent : montant HT des abonnements facturés sur le dernier mois de la période." />
+            <EtatCard
+              total={data.etat.total} totalPrev={data.etat.totalPrev}
+              tva={data.etat.tva} social={data.etat.social} is={data.etat.is}
+              muted={!f.hasBank} foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"} />
           </div>
         </div>
 
@@ -211,13 +237,17 @@ export function Cockpit({
             </div>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <KpiCard icon={<IconUsers size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Clients actuels"
-                value={String(p.clientsActuels)} foot={`${p.totalProspects} prospect(s) au total`} />
+                value={String(p.clientsActuels)} foot={`${p.totalProspects} prospect(s) au total`}
+                info="Prospects devenus clients : à installer + installés." />
               <KpiCard icon={<IconTrophy size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Taux de réussite"
-                value={`${pct1(p.tauxReussite)} %`} foot="clients ÷ (clients + refus)" />
+                value={`${pct1(p.tauxReussite)} %`} foot="clients ÷ (clients + refus)"
+                info="Taux de conversion = clients actuels ÷ (clients actuels + refus)." />
               <KpiCard icon={<IconCalendarEvent size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="À rencontrer"
-                value={String(p.aRencontrer)} foot="rendez-vous à planifier" />
+                value={String(p.aRencontrer)} foot="rendez-vous à planifier"
+                info="Prospects au stade « à rencontrer » : rendez-vous à planifier." />
               <KpiCard icon={<IconPhoneCall size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="À recontacter"
-                value={String(p.aRecontacter)} foot="rappels échus" />
+                value={String(p.aRecontacter)} foot="rappels échus"
+                info="Prospects avec un rappel échu (date de relance dépassée, non traitée)." />
             </div>
           </div>
 
@@ -258,6 +288,29 @@ export function Cockpit({
         )}
       </section>
     </main>
+  );
+}
+
+// Carte d'action compacte de l'en-tête (LOT 1) — « Factures impayées » & « À rencontrer » remontées
+// près du salut. Même langage visuel que KpiCard (tuile d'icône, label capitales) en plus petit.
+function HeaderAction({ href, tint, icon, label, value }: {
+  href: string;
+  tint: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-2.5 rounded-card border border-line bg-white px-3 py-2 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover"
+    >
+      <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-ink-3">{label}</span>
+        <span className="block text-base font-semibold text-ink">{value}</span>
+      </span>
+    </Link>
   );
 }
 

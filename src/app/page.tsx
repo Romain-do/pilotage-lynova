@@ -27,7 +27,7 @@ import {
   horsExploitationByMonth,
   seriesForRange,
   earliestOutflowDate,
-  leayaInRange,
+  etatInRange,
 } from "@/lib/tresorerie";
 import { categoryOf, reminderStatus, formatDateFR, type KpiCategory } from "@/lib/prospection";
 import { Cockpit, type CockpitData } from "./Cockpit";
@@ -86,7 +86,7 @@ async function buildCockpitData(): Promise<CockpitData> {
   const hasBankPrev = bankStart != null && prevRange.end >= bankStart;
   const net = netChargesInRange(treso.outflows, range);
   const netPrev = netChargesInRange(treso.outflows, prevRange);
-  // Marge nette = CA HT − charges Revolut (hors deny-list TVA/IS). Marge commerciale (cur.marge) séparée.
+  // Marge nette = CA HT − charges Revolut (hors deny-list TVA/IS). Marge brute (cur.marge) séparée.
   const margeNette = cur.caHtTotal - net.total;
   const margeNettePrev = prev.caHtTotal - netPrev.total;
   // Rémunération versée (catégorie Revolut « Rémunération ») sur l'exercice à date, vs N-1 même fenêtre.
@@ -95,8 +95,9 @@ async function buildCockpitData(): Promise<CockpitData> {
   const tauxNette = cur.caHtTotal > 0 ? (margeNette / cur.caHtTotal) * 100 : null;
   const tauxNettePrev = prev.caHtTotal > 0 ? (margeNettePrev / prev.caHtTotal) * 100 : null;
   const mrr = computeMRR(docs, range);
-  const leaya = leayaInRange(treso.outflows, range);
-  const leayaPrev = leayaInRange(treso.outflows, prevRange);
+  // « Versé à l'État » = TVA + charges sociales (URSSAF) + IS sur l'exercice, vs N-1 même fenêtre.
+  const etat = etatInRange(treso.outflows, range);
+  const etatPrev = etatInRange(treso.outflows, prevRange);
   // CA HT mensuel exercice vs N-1 (axe fiscal oct→sept).
   const caFyCur = caHtByFiscalMonth(docs, fy);
   const caFyPrev = caHtByFiscalMonth(docs, fy - 1);
@@ -158,13 +159,13 @@ async function buildCockpitData(): Promise<CockpitData> {
   }));
 
   // ── Actions prioritaires (déduites des données) ──
+  // « Factures impayées » et « Prospects à rencontrer » sont remontés en cartes compactes dans
+  // l'en-tête (LOT 1) — ils ne figurent donc plus dans la liste d'alertes ci-dessous.
   const unpaidTtc = docs.reduce((s, d) => s + (d.kind === "INVOICE" ? d.netToPay : 0), 0);
   const alerts: CockpitData["alerts"] = [];
   if (cashNetMonth < 0) alerts.push({ tone: "danger", text: `Cash net négatif ce mois (${euro(cashNetMonth)})`, href: "/tresorerie" });
   if (overdue.length > 0) alerts.push({ tone: "warn", text: `${overdue.length} prospect${overdue.length > 1 ? "s" : ""} à recontacter (rappel échu)`, href: "/prospection" });
-  if (unpaidTtc >= 1) alerts.push({ tone: "warn", text: `${euro(unpaidTtc)} de factures impayées (restant dû)`, href: "/facturation" });
   if (mrr.pct != null && mrr.pct < 0) alerts.push({ tone: "warn", text: `MRR en baisse vs N-1 (${pct1(mrr.pct)} %)`, href: "/facturation" });
-  if (counts.a_rencontrer > 0) alerts.push({ tone: "info", text: `${counts.a_rencontrer} prospect${counts.a_rencontrer > 1 ? "s" : ""} à rencontrer`, href: "/prospection" });
 
   // Aucune donnée d'aucune source (cache vide, avant toute synchro) → état vide dédié au Cockpit,
   // au lieu d'afficher des « 0 € » partout qui ressembleraient à de vraies valeurs.
@@ -179,12 +180,13 @@ async function buildCockpitData(): Promise<CockpitData> {
     // Mention « partiellement à jour » pour les indicateurs composites (Evoliz × Revolut) si une
     // source est périmée — seulement quand la marge nette est effectivement affichée (hasBank).
     staleNote: hasBank ? (staleSourcesLabel(freshness) ? `Partiellement à jour — ${staleSourcesLabel(freshness)}` : undefined) : undefined,
-    leaya,
-    leayaPrev,
+    // total + total N-1 (la carte calcule le delta neutre) + 3 composantes affichées en clair.
+    etat: { total: etat.total, totalPrev: etatPrev.total, tva: etat.tva, social: etat.social, is: etat.is },
     caFyCur,
     caFyPrev,
     tresoSeries,
     caVsCharges,
+    net,
     bankStart,
     finance: {
       caHt: cur.caHtTotal,
@@ -204,6 +206,7 @@ async function buildCockpitData(): Promise<CockpitData> {
       tresoTotal: fiatEur + cryptoEur,
       fiatEur,
       cryptoEur,
+      unpaidTtc,
       cashNetMonth,
       cashNetMonthDelta: hasBankMonthPrev ? rel(cashNetMonth, cashNetMonthPrev) : null,
       monthLabel,

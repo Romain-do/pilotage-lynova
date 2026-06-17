@@ -283,6 +283,27 @@ export function leayaInRange(outflows: OutflowRow[], range: DateRange): number {
   return sum;
 }
 
+/** Total « Versé à l'État » sur la plage : TVA reversée + charges sociales (URSSAF) + impôt
+ *  sociétés (IS), ventilé par composante. Somme des décaissements selon leur catégorie
+ *  `categorize()`. Alimente la carte KPI « Versé à l'État » du Cockpit (polarité neutre). */
+export interface EtatVerse {
+  tva: number;
+  social: number;
+  is: number;
+  total: number;
+}
+export function etatInRange(outflows: OutflowRow[], range: DateRange): EtatVerse {
+  let tva = 0, social = 0, is = 0;
+  for (const o of outflows) {
+    if (!dateInRange(o.date, range)) continue;
+    const c = categorize(o.reference, o.counterparty);
+    if (c === "TVA") tva += o.amount;
+    else if (c === "Charges sociales") social += o.amount;
+    else if (c === "Impôt sociétés (IS)") is += o.amount;
+  }
+  return { tva, social, is, total: tva + social + is };
+}
+
 /** Détail des décaissements d'une catégorie (libellés bruts + dates + montants). */
 export function categoryOutflows(outflows: OutflowRow[], range: DateRange, label: string): OutflowRow[] {
   return outflows

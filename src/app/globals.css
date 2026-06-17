@@ -38,6 +38,13 @@
   --color-leaya-gold: #b8935f; /* doré Leaya (libellés) */
   --color-leaya-ink: #7a5a33; /* brun foncé Leaya (valeurs) */
   --color-leaya-badge: #f1e7d8; /* fond badge Leaya */
+
+  /* « Versé à l'État » — teinte institutionnelle bleu-ardoise (slate soutenu), distincte des KPI et du doré Leaya */
+  --color-etat: #f3f6fb; /* fond ardoise clair */
+  --color-etat-border: #d7e0ee; /* bordure ardoise */
+  --color-etat-accent: #44546f; /* ardoise soutenue (libellés) */
+  --color-etat-ink: #1d2a44; /* ardoise foncée (valeurs) */
+  --color-etat-badge: #e1e8f3; /* fond badge neutre ardoise */
 }
 
 body {

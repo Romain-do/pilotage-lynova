@@ -4,22 +4,15 @@ import { useMemo, useState } from "react";
 import {
   IconCoin,
   IconPigMoney,
-  IconReportMoney,
-  IconPercentage,
   IconRepeat,
   IconShoppingCart,
   IconCash,
   IconClock,
-  IconArrowUpRight,
-  IconArrowDownRight,
-  IconAlertTriangle,
   IconX,
 } from "@tabler/icons-react";
 import {
   euro,
-  euroCompact,
   pct1,
-  apportionEuros,
   formatDateFR,
   computeRange,
   computeMRR,
@@ -43,11 +36,13 @@ import {
   type PresetKey,
   type CatRow,
 } from "@/lib/facturation";
-import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, earliestOutflowDate, type OutflowRow, type RevolutCharges } from "@/lib/tresorerie";
+import { netChargesInRange, chargeComponentsByMonth, horsExploitationByMonth, earliestOutflowDate, leayaInRange, type OutflowRow } from "@/lib/tresorerie";
 import { staleSourcesLabel, type Freshness } from "@/lib/sync-state";
 import { KpiCard } from "@/components/KpiCard";
+import { MargeNetteCard } from "@/components/MargeNetteCard";
+import { LeayaCard } from "@/components/LeayaCard";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
-import { CaVsChargesChart, ChargesLegend, CHARGE_META } from "@/components/CaVsChargesChart";
+import { CaVsChargesChart, ChargesLegend } from "@/components/CaVsChargesChart";
 import { RefreshButton } from "@/components/RefreshButton";
 import { InfoTip } from "@/components/InfoTip";
 
@@ -112,6 +107,9 @@ export function Facturation({
   const bankStart = useMemo(() => earliestOutflowDate(outflows), [outflows]);
   const netCur = useMemo(() => netChargesInRange(outflows, range), [outflows, range]);
   const netPrev = useMemo(() => netChargesInRange(outflows, shiftYear(range)), [outflows, range]);
+  // Total versé à Leaya sur la période (vs N-1) — carte « Leaya » à droite du restant dû.
+  const leaya = useMemo(() => leayaInRange(outflows, range), [outflows, range]);
+  const leayaPrev = useMemo(() => leayaInRange(outflows, shiftYear(range)), [outflows, range]);
   // Données bancaires dispo si la plage atteint au moins le début du cache Revolut.
   const hasBank = bankStart != null && range.end >= bankStart;
   const hasBankPrev = bankStart != null && shiftYear(range).end >= bankStart;
@@ -160,77 +158,80 @@ export function Facturation({
       </div>
 
       {/* ───────── KPI principaux ───────── */}
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} foot={`⌀ ${euro(cur.caHt / months)}/mois`} />
-        <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge commerciale" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)} />
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label={filter === "abo" ? "CA HT — abonnements" : filter === "install" ? "CA HT — installations" : "CA HT"} value={euro(cur.caHt)} delta={rel(cur.caHt, prev.caHt)} foot={`⌀ ${euro(cur.caHt / months)}/mois`}
+          info="Chiffre d'affaires hors taxes : somme des factures validées de la période. ⌀/mois = CA HT ÷ nombre de mois." />
+        <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Marge brute" value={euro(cur.marge)} delta={rel(cur.marge, prev.marge)}
+          info="Marge brute = CA HT − achats fournisseurs (Evoliz)." />
+        {/* Marge nette + taux de marge nette fusionnés dans une seule carte. */}
         <MargeNetteCard
           hasBank={hasBank}
           value={margeNette}
           delta={hasBank && hasBankPrev ? rel(margeNette, margeNettePrev) : null}
           caHtTotal={cur.caHtTotal}
           net={netCur}
+          taux={tauxNette}
+          tauxDeltaPts={tauxNetteDeltaPts}
           staleNote={staleNote}
         />
-        <KpiCard
-          icon={<IconPercentage size={18} stroke={2} />}
-          tint="bg-amber-50 text-amber-600"
-          label="Taux de marge nette"
-          value={hasBank && tauxNette != null ? `${pct1(tauxNette)} %` : "n/a"}
-          muted={!hasBank}
-          delta={tauxNetteDeltaPts}
-          deltaUnit="pts"
-          staleNote={staleNote}
-        />
-        <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct} />
+        <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${mrr.monthLabel ?? "—"}`} value={euro(mrr.mrr)} delta={mrr.pct}
+          info="Revenu mensuel récurrent : montant HT des abonnements facturés sur le dernier mois de la période." />
       </div>
 
       {/* ───────── Stats secondaires (même gabarit KpiCard, comparaison N-1) ───────── */}
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats HT" value={euro(cur.achatsHt)} delta={rel(cur.achatsHt, prev.achatsHt)} positiveIsGood={false} foot={`⌀ ${euro(achatsAvg)}/mois`} />
-        <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)} />
-        <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1" />
+      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard icon={<IconShoppingCart size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="Achats HT" value={euro(cur.achatsHt)} delta={rel(cur.achatsHt, prev.achatsHt)} positiveIsGood={false} foot={`⌀ ${euro(achatsAvg)}/mois`}
+          info="Total des achats fournisseurs (Evoliz) en HT sur la période. ⌀/mois = achats ÷ nombre de mois." />
+        <KpiCard icon={<IconCash size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Encaissé TTC" value={euro(cur.encaisseTtc)} delta={rel(cur.encaisseTtc, prev.encaisseTtc)}
+          info="Montant TTC déjà encaissé sur les factures de la période." />
+        <KpiCard icon={<IconClock size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Restant dû TTC" value={euro(cur.resteTtc)} foot="solde instantané · pas de N-1"
+          info="Montant TTC restant à encaisser sur les factures de la période (solde instantané, sans comparaison N-1)." />
+        <LeayaCard ttc={leaya} ttcPrev={leayaPrev} />
       </div>
 
       {/* ───────── Graphiques ───────── */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-card border border-line bg-white p-4 shadow-card lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
-            <ChargesLegend />
+      {/* Colonne gauche 2/3 : « CA vs charges » puis « CA HT mensuel » empilés ; colonne droite 1/3 :
+          « Répartition CA & achats » (donut + détail), étirée sur toute la hauteur. */}
+      <div className="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <div className="rounded-card border border-line bg-white p-4 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
+              <ChargesLegend />
+            </div>
+            <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-ink-3">
+              CA HT vs charges — marge nette du mois
+              <InfoTip label="Détail CA vs charges">
+                <strong className="font-semibold text-ink">CA</strong> en HT ; <strong className="font-semibold text-ink">charges &amp; dépenses</strong> en TTC
+                (montants réellement décaissés). Marge nette = CA HT − charges d&apos;exploitation. <strong className="font-semibold text-ink">TVA</strong> reversée
+                &amp; <strong className="font-semibold text-ink">IS</strong> affichés hors exploitation (visuels, hors marge).
+              </InfoTip>
+            </p>
+            <CaVsChargesChart
+              data={{
+                months: cur.months,
+                abo: cur.aboByMonth,
+                install: cur.installByMonth,
+                charges: chargeComps,
+                horsExploit,
+              }}
+              bankStart={bankStart}
+            />
           </div>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-ink-3">
-            CA HT vs charges — marge nette du mois
-            <InfoTip label="Détail CA vs charges">
-              <strong className="font-semibold text-ink">CA</strong> en HT ; <strong className="font-semibold text-ink">charges &amp; dépenses</strong> en TTC
-              (montants réellement décaissés). Marge nette = CA HT − charges d&apos;exploitation. <strong className="font-semibold text-ink">TVA</strong> reversée
-              &amp; <strong className="font-semibold text-ink">IS</strong> affichés hors exploitation (visuels, hors marge).
-            </InfoTip>
-          </p>
-          <CaVsChargesChart
-            data={{
-              months: cur.months,
-              abo: cur.aboByMonth,
-              install: cur.installByMonth,
-              charges: chargeComps,
-              horsExploit,
-            }}
-            bankStart={bankStart}
-          />
+
+          <div className="rounded-card border border-line bg-white p-4 shadow-card">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {fyNow} vs {fyNow - 1}</h2>
+              <div className="flex items-center gap-3 text-xs text-ink-2">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
+              </div>
+            </div>
+            <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
+          </div>
         </div>
 
         <SynthBlock stats={cur} />
-      </div>
-
-      {/* ───────── CA HT mensuel — exercice vs N-1 ───────── */}
-      <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {fyNow} vs {fyNow - 1}</h2>
-          <div className="flex items-center gap-3 text-xs text-ink-2">
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {fyNow - 1}</span>
-          </div>
-        </div>
-        <CaVsN1Chart current={caFyCur} previous={caFyPrev} fy={fyNow} />
       </div>
 
       {/* « Évolution rémunération » retirée d'Evoliz (donnée bancaire) → visible sur Revolut + Cockpit. */}
@@ -257,7 +258,7 @@ export function Facturation({
             <h2 className="text-sm font-semibold text-ink">Achats par catégorie</h2>
             <InfoTip label="À propos des achats par catégorie">
               L&apos;<strong className="font-semibold text-ink">électricité</strong> (captée via Revolut) est exclue
-              de la marge commerciale Evoliz pour éviter le double comptage.
+              de la marge brute Evoliz pour éviter le double comptage.
             </InfoTip>
           </div>
           <p className="text-xs text-ink-3">Cliquez une catégorie pour le détail</p>
@@ -266,10 +267,10 @@ export function Facturation({
       </div>
 
       <p className="mt-4 flex flex-wrap items-center gap-1 text-xs text-ink-3">
-        CA en <strong className="text-ink-2">HT brut</strong> · marges commerciale &amp; nette · encaissé / restant dû en <strong className="text-ink-2">TTC</strong>.
+        CA en <strong className="text-ink-2">HT brut</strong> · marges brute &amp; nette · encaissé / restant dû en <strong className="text-ink-2">TTC</strong>.
         <InfoTip label="Définitions des indicateurs">
           <span className="block"><strong className="font-semibold text-ink">CA HT brut</strong> : factures validées, avoirs non déduits.</span>
-          <span className="mt-1 block">Marge <strong className="font-semibold text-ink">commerciale</strong> = CA − achats fournisseurs Evoliz.</span>
+          <span className="mt-1 block">Marge <strong className="font-semibold text-ink">brute</strong> = CA − achats fournisseurs Evoliz.</span>
           <span className="mt-1 block">Marge <strong className="font-semibold text-ink">nette</strong> = CA HT − charges d&apos;exploitation Revolut en TTC (décaissements réellement sortis, hors TVA &amp; IS, URSSAF incluse).</span>
           <span className="mt-1 block">La <strong className="font-semibold text-ink">TVA</strong> reversée et l&apos;<strong className="font-semibold text-ink">IS</strong> sont affichés hors exploitation (visuels, hors marge).</span>
         </InfoTip>
@@ -371,116 +372,20 @@ function Toolbar({
 
 /* ───────────────────────── KPI & stats ───────────────────────── */
 
-// Carte « Marge nette » = CA HT − charges Revolut (tous décaissements externes hors deny-list
-// TVA/IS). Grise et explicite si la plage précède les données bancaires (nov. 2024).
-function MargeNetteCard({
-  hasBank, value, delta, caHtTotal, net, staleNote,
-}: {
-  hasBank: boolean; value: number; delta: number | null;
-  caHtTotal: number;
-  net: RevolutCharges;
-  staleNote?: string;
-}) {
-  // Détail accessible souris (group-hover), tactile & clavier (toggle `open` + ×).
-  const [open, setOpen] = useState(false);
-  // Ventilation arrondie par apportionnement → CA HT − Σ postes == marge nette affichée (tombe juste).
-  const detailCats = CHARGE_META.filter((m) => net.byCategory[m.key] > 0);
-  const detailRounded = apportionEuros(detailCats.map((m) => net.byCategory[m.key]), Math.round(caHtTotal) - Math.round(value));
-  return (
-    <div className="group relative rounded-card border border-line bg-white p-3.5 shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover">
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-violet-50 text-violet-600">
-          <IconReportMoney size={18} stroke={2} />
-        </span>
-        <span className="truncate text-xs font-medium uppercase tracking-wide text-ink-3">Marge nette (approchée)</span>
-      </div>
-      {hasBank ? (
-        <>
-          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{euro(value)}</div>
-          <div className="mt-1.5 min-h-4 text-xs">
-            {delta == null ? (
-              <span className="text-ink-3">Vs N-1 : —</span>
-            ) : (
-              <span className="inline-flex items-center gap-1">
-                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                  {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-                  {pct1(Math.abs(delta))} %
-                </span>
-                <span className="text-ink-3">Vs N-1</span>
-              </span>
-            )}
-          </div>
-          {staleNote && (
-            <div className="mt-1 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-              <IconAlertTriangle size={11} stroke={2.5} /> {staleNote}
-            </div>
-          )}
-          <div className="mt-1 flex items-baseline justify-between gap-2">
-            <p className="text-[10px] italic leading-tight text-ink-3">CA HT − charges TTC (approché) · depuis nov. 2024</p>
-            <button
-              type="button"
-              onClick={() => setOpen((o) => !o)}
-              aria-expanded={open}
-              aria-controls="marge-nette-detail"
-              className="flex-none rounded text-[10px] font-medium text-cyan-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
-            >
-              {open ? "Masquer" : "Détail"}
-            </button>
-          </div>
-          {/* Détail : survol souris (group-hover) + ouverture tactile/clavier (open) */}
-          <div
-            id="marge-nette-detail"
-            className={`absolute left-1/2 top-full z-20 mt-1 max-h-80 w-64 -translate-x-1/2 overflow-auto rounded-card border border-line bg-white p-3 text-xs shadow-card-hover group-hover:block ${open ? "pointer-events-auto block" : "pointer-events-none hidden"}`}
-          >
-            {open && (
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Fermer le détail"
-                className="absolute right-1.5 top-1.5 rounded p-0.5 text-ink-3 hover:bg-cloud hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
-              >
-                <IconX size={13} />
-              </button>
-            )}
-            <div className="pr-4 font-semibold text-ink">Marge nette = CA HT − charges d&apos;exploitation (TTC)</div>
-            <div className="mt-2 space-y-1">
-              <TipRow label="CA HT" value={euro(Math.round(caHtTotal))} />
-              <div className="my-1 border-t border-line" />
-              {detailCats.map((m, k) => (
-                <TipRow key={m.key} label={`− ${m.label}`} value={euro(-detailRounded[k])} />
-              ))}
-              <div className="mt-1 border-t border-line pt-1"><TipRow label="= Marge nette" value={euro(value)} strong /></div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink-3">n/a</div>
-          <p className="mt-1.5 min-h-4 text-xs leading-tight text-ink-3">pas de données bancaires avant nov. 2024</p>
-        </>
-      )}
-    </div>
-  );
-}
-
-function TipRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-ink-2">{label}</span>
-      <span className={`ml-auto ${strong ? "font-semibold text-ink" : "font-medium text-ink"}`}>{value}</span>
-    </div>
-  );
-}
-
 /* ───────────────── Synthèse : répartition CA & achats ───────────────── */
 
 function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; installHt: number; achatsHt: number; marge: number } }) {
   const [hover, setHover] = useState<"abo" | "install" | null>(null);
   const sum = stats.aboHt + stats.installHt;
   const aboPct = sum > 0 ? stats.aboHt / sum : 0;
-  const r = 48;
+  // Anneau plus fin (12) → trou plus large : le montant COMPLET (euro()) tient au centre.
+  const r = 50;
   const c = 2 * Math.PI * r;
   const aboLen = aboPct * c;
+  // Montant complet au centre. Police adaptée à la longueur (les millions « 1 234 567 € »
+  // restent dans le trou) : grand par défaut, réduit pour les nombres longs.
+  const caStr = euro(stats.caHtTotal);
+  const caCls = caStr.length <= 9 ? "text-xl" : caStr.length <= 12 ? "text-lg" : "text-base";
   // Segment survolé : son détail va dans le tooltip externe + la légende — JAMAIS au centre.
   const seg =
     hover === "abo" ? { label: "Abonnements", value: stats.aboHt, pct: aboPct }
@@ -488,26 +393,27 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
     : null;
 
   return (
-    <div className="rounded-card border border-line bg-white p-4 shadow-card">
+    <div className="flex h-full flex-col rounded-card border border-line bg-white p-4 shadow-card">
       <h2 className="text-sm font-semibold text-ink">Répartition CA &amp; achats</h2>
-      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-        <div className="relative h-28 w-28 flex-none">
-          <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90" role="img"
+      {/* Donut en haut, centré dans l'espace vertical libre (comble le vide de la colonne) */}
+      <div className="flex flex-1 items-center justify-center py-5">
+        <div className="relative h-52 w-52 flex-none">
+          <svg viewBox="0 0 128 128" className="h-52 w-52 -rotate-90" role="img"
             aria-label={`Répartition du CA HT : ${euro(stats.caHtTotal)} au total — abonnements ${euro(stats.aboHt)} (${pct1(aboPct * 100)} %), installations ${euro(stats.installHt)} (${pct1((1 - aboPct) * 100)} %). Achats ${euro(stats.achatsHt)}, marge ${euro(stats.marge)}.`}>
             <title>Répartition du CA HT (abonnements / installations) et achats / marge</title>
-            <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-line)" strokeWidth="14" />
+            <circle cx="64" cy="64" r={r} fill="none" stroke="var(--color-line)" strokeWidth="12" />
             <circle cx="64" cy="64" r={r} fill="none" className="text-cyan transition-[stroke-width] duration-200" stroke="currentColor"
-              strokeWidth={hover === "abo" ? 17 : 14} strokeDasharray={`${aboLen} ${c - aboLen}`}
+              strokeWidth={hover === "abo" ? 15 : 12} strokeDasharray={`${aboLen} ${c - aboLen}`}
               onMouseEnter={() => setHover("abo")} onMouseLeave={() => setHover(null)} />
             <circle cx="64" cy="64" r={r} fill="none" className="text-navy transition-[stroke-width] duration-200" stroke="currentColor"
-              strokeWidth={hover === "install" ? 17 : 14} strokeDasharray={`${c - aboLen} ${aboLen}`} strokeDashoffset={-aboLen}
+              strokeWidth={hover === "install" ? 15 : 12} strokeDasharray={`${c - aboLen} ${aboLen}`} strokeDashoffset={-aboLen}
               onMouseEnter={() => setHover("install")} onMouseLeave={() => setHover(null)} />
           </svg>
-          {/* Centre FIXE : « CA HT » + total en format compact. Ne change jamais (ni au survol) →
-              ne peut pas déborder du trou. Format compact + tabular-nums = toujours contenu. */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-            <span className="text-[9px] uppercase tracking-wide text-ink-3">CA HT</span>
-            <span className="text-sm font-semibold tabular-nums leading-tight text-ink">{euroCompact(stats.caHtTotal)}</span>
+          {/* Centre FIXE : « CA HT » + total COMPLET (euro()). Ne change jamais (ni au survol).
+              Police adaptée à la longueur + tabular-nums → le montant reste dans le trou. */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-0.5 px-3 text-center">
+            <span className="text-[11px] uppercase tracking-wide text-ink-3">CA HT</span>
+            <span className={`font-semibold tabular-nums leading-tight text-ink ${caCls}`}>{caStr}</span>
           </div>
           {/* Tooltip court à côté du donut (au-dessus) — segment survolé, jamais au centre. */}
           {seg && (
@@ -517,20 +423,21 @@ function SynthBlock({ stats }: { stats: { caHtTotal: number; aboHt: number; inst
             </div>
           )}
         </div>
-        <div className="w-full min-w-0 flex-1 space-y-2 text-sm">
-          <LegButton color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} pct={aboPct}
-            active={hover === "abo"} onHover={(v) => setHover(v ? "abo" : null)} />
-          <LegButton color="bg-navy" label="Installations" value={euro(stats.installHt)} pct={1 - aboPct}
-            active={hover === "install"} onHover={(v) => setHover(v ? "install" : null)} />
-          <div className="flex items-center gap-2 border-t border-line pt-2">
-            <span className="h-2.5 w-2.5 flex-none rounded-full bg-transparent" />
-            <span className="font-medium text-ink">CA HT total</span>
-            <span className="ml-auto font-semibold tabular-nums text-ink">{euro(stats.caHtTotal)}</span>
-          </div>
-          <div className="space-y-2 border-t border-line pt-2">
-            <LegRow color="bg-amber-400" label="Achats" value={euro(stats.achatsHt)} />
-            <LegRow color="bg-emerald-500" label="Marge" value={euro(stats.marge)} strong />
-          </div>
+      </div>
+      {/* Détail en dessous du donut */}
+      <div className="w-full min-w-0 space-y-2 text-sm">
+        <LegButton color="bg-cyan" label="Abonnements" value={euro(stats.aboHt)} pct={aboPct}
+          active={hover === "abo"} onHover={(v) => setHover(v ? "abo" : null)} />
+        <LegButton color="bg-navy" label="Installations" value={euro(stats.installHt)} pct={1 - aboPct}
+          active={hover === "install"} onHover={(v) => setHover(v ? "install" : null)} />
+        <div className="flex items-center gap-2 border-t border-line pt-2">
+          <span className="h-2.5 w-2.5 flex-none rounded-full bg-transparent" />
+          <span className="font-medium text-ink">CA HT total</span>
+          <span className="ml-auto font-semibold tabular-nums text-ink">{euro(stats.caHtTotal)}</span>
+        </div>
+        <div className="space-y-2 border-t border-line pt-2">
+          <LegRow color="bg-amber-400" label="Achats" value={euro(stats.achatsHt)} />
+          <LegRow color="bg-emerald-500" label="Marge" value={euro(stats.marge)} strong />
         </div>
       </div>
     </div>

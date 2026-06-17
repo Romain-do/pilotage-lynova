@@ -142,9 +142,11 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
       {/* KPI */}
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard icon={<IconWallet size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="Trésorerie totale"
-          value={euro(total)} foot={`fiat ${euro(fiatEur)} · crypto ${euro(cryptoEur)}`} />
+          value={euro(total)} foot={`fiat ${euro(fiatEur)} · crypto ${euro(cryptoEur)}`}
+          info="Valeur de tous les comptes : liquidités fiat (EUR + devises converties) + cryptos valorisées au cours Revolut. Solde instantané." />
         <KpiCard icon={<IconCoins size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label="Liquidités fiat"
-          value={euro(fiatEur)} foot="EUR + devises converties" />
+          value={euro(fiatEur)} foot="EUR + devises converties"
+          info="Soldes des comptes en devises : EUR + autres devises converties en EUR au cours Revolut." />
         <KpiCard icon={<IconCurrencyBitcoin size={18} stroke={2} />} tint="bg-amber-50 text-amber-600" label="P&L crypto (global)"
           value={euro(p.pnl)} delta={p.pct} deltaLabel="rendement"
           foot="gain/perte depuis l'origine · estimation"
@@ -161,7 +163,8 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
           } />
         <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label="Cash net de la période"
           value={euro(flows.net)} delta={flowsPrev.net !== 0 ? rel(flows.net, flowsPrev.net) : null}
-          foot={`entrées ${euro(flows.inflow)} · sorties ${euro(flows.outflow)}`} />
+          foot={`entrées ${euro(flows.inflow)} · sorties ${euro(flows.outflow)}`}
+          info="Flux net de la période : encaissements − décaissements externes (hors virements internes et crypto)." />
         <LeayaCard ttc={leaya} ttcPrev={leayaPrev} />
       </div>
 
