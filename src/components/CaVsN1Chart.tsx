@@ -45,13 +45,13 @@ export function CaVsN1Chart({
               className="relative flex h-full flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
             >
               <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${sel === i ? "bg-cyan/[0.07]" : ""}`} />
-              <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-5">
+              <div className="relative flex h-full w-full items-end justify-center gap-1 pb-5">
                 <div
-                  className={`w-2.5 origin-bottom rounded-t-sm bg-cyan transition-opacity duration-200 sm:w-3 ${active ? "opacity-100" : "opacity-40"}`}
+                  className={`w-4 origin-bottom rounded-t-sm bg-cyan transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
                   style={{ height: `${Math.min(100, (at(current, i) / max) * 100)}%` }}
                 />
                 <div
-                  className={`w-2.5 origin-bottom rounded-t-sm bg-ink-3/40 transition-opacity duration-200 sm:w-3 ${active ? "opacity-100" : "opacity-40"}`}
+                  className={`w-4 origin-bottom rounded-t-sm bg-ink-3/40 transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
                   style={{ height: `${Math.min(100, (at(previous, i) / max) * 100)}%` }}
                 />
               </div>
