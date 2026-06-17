@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   IconCoin,
   IconPigMoney,
-  IconRepeat,
   IconWallet,
   IconArrowsExchange,
   IconUsers,
@@ -21,6 +20,8 @@ import { AppNav } from "@/components/AppNav";
 import { KpiCard } from "@/components/KpiCard";
 import { EtatCard } from "@/components/EtatCard";
 import { MargeNetteCard } from "@/components/MargeNetteCard";
+import { MrrCard } from "@/components/MrrCard";
+import { CaProjectionCard, type CaProjection } from "@/components/CaProjectionCard";
 import { FySelect } from "@/components/FySelect";
 import type { RevolutCharges } from "@/lib/tresorerie";
 import { CaVsN1Chart } from "@/components/CaVsN1Chart";
@@ -51,19 +52,28 @@ export interface CockpitData {
   caFyPrev: number[];
   // Évolution de la trésorerie (solde fin de mois, 12 derniers mois) — réutilise TresoAreaChart.
   tresoSeries: SeriePoint[];
+  // Courbe N-1 trésorerie (mois sans données bancaires marqués `missing` → courbe interrompue).
+  tresoSeriesPrev: SeriePoint[];
+  // Prolongement projeté du solde fiat EUR en fourchette (exercice en cours) — vide hors exercice courant.
+  tresoProjection: { label: string; low: number; high: number }[];
+  // Évolution du MRR mensuel (abonnements facturés) + courbe N-1 — réutilise TresoAreaChart.
+  mrrSeries: SeriePoint[];
+  mrrSeriesPrev: SeriePoint[];
+  // Projection CA HT (exercice en cours) — null si non applicable.
+  caProjection: CaProjection | null;
   // CA vs charges mensuel HT (exercice en cours) — réutilise CaVsChargesChart.
   caVsCharges: ChargeSeries;
   // Charges Revolut de l'exercice (total + ventilation par catégorie) — détail de la marge nette.
   net: RevolutCharges;
   bankStart: string | null;
   finance: {
-    caHt: number; caHtAvg: number; caDelta: number | null;
-    margeNette: number; margeNetteDelta: number | null; hasBank: boolean;
-    remu: number; remuAvg: number; remuDelta: number | null;
+    caHt: number; caHtPrev: number; caHtAvg: number; caDelta: number | null;
+    margeNette: number; margeNettePrev: number; margeNetteDelta: number | null; hasBank: boolean;
+    remu: number; remuPrev: number; remuAvg: number; remuDelta: number | null;
     tauxNette: number | null; tauxNetteDeltaPts: number | null;
-    mrr: number; mrrDelta: number | null; mrrLabel: string | null;
+    mrr: number; mrrPrev: number; mrrDelta: number | null; mrrLabel: string | null;
     tresoTotal: number; fiatEur: number; cryptoEur: number;
-    cashNetFy: number; cashNetFyDelta: number | null;
+    cashNetFy: number; cashNetFyPrev: number; cashNetFyDelta: number | null;
     unpaidTtc: number;
   };
   prospection: {
@@ -163,12 +173,13 @@ export function Cockpit({
           <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {/* Essentiels en tête : CA HT · Marge nette · Trésorerie · Cash net */}
             <KpiCard icon={<IconCoin size={18} stroke={2} />} tint="bg-cyan/15 text-cyan-600" label="CA HT"
-              value={euro(f.caHt)} delta={f.caDelta} foot={`⌀ ${euro(f.caHtAvg)}/mois`}
+              value={euro(f.caHt)} valueRaw={f.caHt} valuePrev={f.caHtPrev} avgFoot={`⌀ ${euro(f.caHtAvg)}/mois`}
               info="Chiffre d'affaires hors taxes : somme des factures validées sur l'exercice. ⌀/mois = CA HT ÷ nombre de mois écoulés." />
             {/* Marge nette + taux de marge nette fusionnés dans une seule carte. */}
             <MargeNetteCard
               hasBank={f.hasBank}
               value={f.margeNette}
+              valuePrev={f.margeNettePrev}
               delta={f.margeNetteDelta}
               caHtTotal={f.caHt}
               net={data.net}
@@ -182,17 +193,25 @@ export function Cockpit({
               info="Valeur de tous les comptes : liquidités fiat (EUR + devises converties) + cryptos valorisées au cours Revolut. Solde instantané (ne suit pas l'exercice sélectionné)." />
             <KpiCard icon={<IconArrowsExchange size={18} stroke={2} />} tint="bg-emerald-50 text-emerald-600" label={`Cash net · exercice ${data.fy}`}
               value={f.hasBank ? euro(f.cashNetFy) : "n/a"} muted={!f.hasBank}
-              delta={f.hasBank ? f.cashNetFyDelta : null}
+              valueRaw={f.cashNetFy} valuePrev={f.cashNetFyPrev}
               foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"}
               info="Flux net cumulé sur l'exercice sélectionné : encaissements − décaissements externes (hors virements internes et crypto)." />
-            <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération"
-              value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
-              delta={f.hasBank ? f.remuDelta : null} deltaNeutral
-              foot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : "pas de données bancaires avant nov. 2024"}
-              info="Total versé au dirigeant sur l'exercice : décaissements Revolut catégorisés « Rémunération »." />
-            <KpiCard icon={<IconRepeat size={18} stroke={2} />} tint="bg-sky-50 text-sky-600" label={`MRR · ${f.mrrLabel ?? "—"}`}
-              value={euro(f.mrr)} delta={f.mrrDelta}
-              info="Revenu mensuel récurrent : montant HT des abonnements facturés sur le dernier mois de la période." />
+            {/* Colonne 1 de la rangée : Rémunération (compacte) + CA HT projeté empilés, alignés sur
+                la hauteur de la grande carte MRR (col 2-3). */}
+            <div className="flex h-full flex-col gap-3">
+              <KpiCard icon={<IconPigMoney size={18} stroke={2} />} tint="bg-rose-50 text-rose-600" label="Rémunération" compact
+                value={f.hasBank ? euro(f.remu) : "n/a"} muted={!f.hasBank}
+                valueRaw={f.remu} valuePrev={f.remuPrev} deltaNeutral
+                avgFoot={f.hasBank ? `⌀ ${euro(f.remuAvg)}/mois` : undefined}
+                foot={f.hasBank ? undefined : "pas de données bancaires avant nov. 2024"}
+                info="Total versé au dirigeant sur l'exercice : décaissements Revolut catégorisés « Rémunération »." />
+              <CaProjectionCard fy={data.fy} projection={data.caProjection} className="flex-1" />
+            </div>
+            <MrrCard
+              mrr={f.mrr} mrrPrev={f.mrrPrev} monthLabel={f.mrrLabel}
+              series={data.mrrSeries}
+              compare={data.mrrSeriesPrev.some((s) => s.endBalance > 0) ? data.mrrSeriesPrev : undefined}
+            />
             <EtatCard
               total={data.etat.total} totalPrev={data.etat.totalPrev}
               tva={data.etat.tva} social={data.etat.social} is={data.etat.is}
@@ -200,11 +219,25 @@ export function Cockpit({
           </div>
         </div>
 
-        {/* Évolution de la trésorerie (12 derniers mois) */}
+        {/* Évolution de la trésorerie (+ fourchette de projection du solde fiat EUR sur l'exercice en cours) */}
         <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
-          <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
-          <p className="text-xs text-ink-3">Solde EUR fin de mois · exercice {data.fy}</p>
-          <TresoAreaChart series={data.tresoSeries} />
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
+            {data.tresoProjection.length > 0 && (
+              <InfoTip label="Détail : projection de trésorerie">
+                <span className="block">Fourchette de projection (exercice en cours, à rythme constant), à partir du dernier solde fiat EUR réel.</span>
+                <span className="mt-1 block">Cash futur = <strong className="font-semibold text-ink">CA HT projeté × taux de marge nette de l&apos;exercice</strong>.</span>
+                <span className="mt-1 block"><strong className="font-semibold text-ink">Quasi certaine</strong> (borne basse) = solde + (MRR × tauxNet) × mois restants.</span>
+                <span className="mt-1 block"><strong className="font-semibold text-ink">Potentielle</strong> (borne haute) = solde + (run-rate CA HT 6 mois × tauxNet) × mois restants.</span>
+                <span className="mt-1 block text-ink-3">CA en HT, sans correction du décalage HT/TTC ni du reliquat du mois en cours → projection conservatrice.</span>
+              </InfoTip>
+            )}
+          </div>
+          <p className="text-xs text-ink-3">Solde fiat EUR fin de mois · exercice {data.fy}{data.tresoProjection.length > 0 ? " · projeté à fin sept. (fourchette)" : ""}</p>
+          {data.tresoProjection.length > 0 && f.tauxNette != null && f.tauxNette <= 0 && (
+            <p className="mt-0.5 text-[11px] italic text-ink-3">Taux de marge nette négatif → projection en baisse.</p>
+          )}
+          <TresoAreaChart series={data.tresoSeries} compare={data.tresoSeriesPrev} projection={data.tresoProjection} />
         </div>
 
         {/* CA HT mensuel — exercice vs N-1 */}
@@ -213,7 +246,7 @@ export function Cockpit({
             <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {data.fy} vs {data.fy - 1}</h2>
             <div className="flex items-center gap-3 text-xs text-ink-2">
               <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {data.fy}</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-ink-3/40" /> Exercice {data.fy - 1}</span>
+              <span className="inline-flex items-center gap-1.5 text-n1-text"><span className="h-2.5 w-2.5 rounded-sm bg-n1" /> Exercice {data.fy - 1}</span>
             </div>
           </div>
           <CaVsN1Chart current={data.caFyCur} previous={data.caFyPrev} fy={data.fy} />

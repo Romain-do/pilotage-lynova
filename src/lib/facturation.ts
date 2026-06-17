@@ -306,21 +306,47 @@ export function monthAbo(docs: FactDoc[], monthKey: string): number {
   }
   return s;
 }
+
+// CA HT total (abonnements + installations) d'un mois civil — base des projections (run-rate).
+export function monthCa(docs: FactDoc[], monthKey: string): number {
+  let s = 0;
+  for (const d of docs) {
+    if (d.kind !== "INVOICE" || d.date.slice(0, 7) !== monthKey) continue;
+    s += d.ht;
+  }
+  return s;
+}
+
+// Libellé court d'un mois civil (« oct 25 ») — même format que l'axe des graphes mensuels.
+export function monthLabelShort(monthKey: string): string {
+  return `${MONTH_ABBR[Number(monthKey.slice(5, 7)) - 1]} ${monthKey.slice(2, 4)}`;
+}
 export interface MrrResult {
   monthKey: string | null;
   monthLabel: string | null;
   mrr: number;
+  // MRR du même mois l'année précédente (N-1) — base du delta % et de la ligne « N-1 X € ».
+  prev: number;
   pct: number | null;
 }
+// MRR (abonnements facturés) de CHAQUE mois civil de la plage — série du graphe « Évolution du MRR ».
+// MRR « heuristique » = somme des factures d'abonnement (< 2000 € HT) émises le mois. Pas de notion
+// de contrat/récurrence dans le cache Evoliz → on ne peut pas isoler proprement new/churn (l'absence
+// de facture un mois ≠ résiliation). On expose donc le NIVEAU mensuel ; la variation nette
+// (MRR_m − MRR_{m-1}) est dérivée à l'affichage.
+export function mrrByMonth(docs: FactDoc[], range: DateRange): { key: string; label: string; mrr: number }[] {
+  return monthsInRange(range).map((m) => ({ key: m.key, label: m.label, mrr: monthAbo(docs, m.key) }));
+}
+
 export function computeMRR(docs: FactDoc[], range: DateRange): MrrResult {
   const months = monthsInRange(range);
   const last = months[months.length - 1];
-  if (!last) return { monthKey: null, monthLabel: null, mrr: 0, pct: null };
+  if (!last) return { monthKey: null, monthLabel: null, mrr: 0, prev: 0, pct: null };
   const mrr = monthAbo(docs, last.key);
   const prevKey = `${Number(last.key.slice(0, 4)) - 1}${last.key.slice(4)}`;
   const prev = monthAbo(docs, prevKey);
   const full = MONTH_FULL[Number(last.key.slice(5, 7)) - 1];
-  return { monthKey: last.key, monthLabel: `${full} ${last.key.slice(0, 4)}`, mrr, pct: rel(mrr, prev) };
+  return { monthKey: last.key, monthLabel: `${full} ${last.key.slice(0, 4)}`, mrr, prev, pct: rel(mrr, prev) };
 }
 
 // ── Clients (installations / abonnements / total) ──

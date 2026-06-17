@@ -51,7 +51,7 @@ export function CaVsN1Chart({
                   style={{ height: `${Math.min(100, (at(current, i) / max) * 100)}%` }}
                 />
                 <div
-                  className={`w-4 origin-bottom rounded-t-sm bg-ink-3/40 transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
+                  className={`w-4 origin-bottom rounded-t-sm bg-n1 transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
                   style={{ height: `${Math.min(100, (at(previous, i) / max) * 100)}%` }}
                 />
               </div>
@@ -91,19 +91,19 @@ function Tooltip({ index, n, label, cur, prev, fy, pinned, onClose }: { index: n
       <div className="pr-4 font-semibold text-ink">{label}</div>
       <div className="mt-2 space-y-1">
         <Row color="bg-cyan" label={`Exercice ${fy}`} value={euro(cur)} />
-        <Row color="bg-ink-3/40" label={`Exercice ${fy - 1}`} value={euro(prev)} />
+        <Row color="bg-n1" label={`Exercice ${fy - 1}`} value={euro(prev)} accent />
       </div>
       <div className="mt-2 border-t border-line pt-1.5 text-ink-3">{d != null ? `${d >= 0 ? "+" : ""}${pct1(d)} % vs N-1` : "—"}</div>
     </div>
   );
 }
 
-function Row({ color, label, value }: { color: string; label: string; value: string }) {
+function Row({ color, label, value, accent }: { color: string; label: string; value: string; accent?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className={`h-2.5 w-2.5 rounded-sm ${color}`} />
-      <span className="text-ink-2">{label}</span>
-      <span className="ml-auto font-medium text-ink">{value}</span>
+      <span className={accent ? "text-n1-text" : "text-ink-2"}>{label}</span>
+      <span className={`ml-auto font-medium ${accent ? "text-n1-text" : "text-ink"}`}>{value}</span>
     </div>
   );
 }

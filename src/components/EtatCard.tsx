@@ -27,6 +27,7 @@ export function EtatCard({
   foot?: string;
 }) {
   const delta = !muted && totalPrev > 0 ? rel(total, totalPrev) : null;
+  const dEur = total - totalPrev; // delta € vs N-1 (neutre)
   const rows: { label: string; hint: string; value: number }[] = [
     { label: "TVA", hint: "TVA reversée", value: tva },
     { label: "URSSAF", hint: "Charges sociales", value: social },
@@ -53,15 +54,18 @@ export function EtatCard({
         {muted ? "n/a" : euro(total)}
       </div>
 
-      <div className="mt-1.5 min-h-4 text-xs">
+      <div className="mt-1.5 min-h-4 space-y-1 text-xs">
         {delta != null ? (
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-etat-badge px-1.5 py-0.5 font-semibold text-etat-ink">
-              {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
-              {pct1(Math.abs(delta))} %
+          <>
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-etat-badge px-1.5 py-0.5 font-semibold text-etat-ink">
+                {delta >= 0 ? <IconArrowUpRight size={12} stroke={2.5} /> : <IconArrowDownRight size={12} stroke={2.5} />}
+                {pct1(Math.abs(delta))} %
+              </span>
+              <span className="font-medium text-ink-2">{dEur >= 0 ? "+" : "−"}{euro(Math.abs(dEur))}</span>
             </span>
-            <span className="text-ink-3">Vs N-1</span>
-          </span>
+            <div className="text-[11px] font-medium text-n1-text">N-1 {euro(totalPrev)}</div>
+          </>
         ) : (
           foot && <span className="text-ink-3">{foot}</span>
         )}
