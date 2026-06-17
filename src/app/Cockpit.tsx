@@ -54,8 +54,6 @@ export interface CockpitData {
   tresoSeries: SeriePoint[];
   // Courbe N-1 trésorerie (mois sans données bancaires marqués `missing` → courbe interrompue).
   tresoSeriesPrev: SeriePoint[];
-  // Prolongement projeté du solde fiat EUR en fourchette (exercice en cours) — vide hors exercice courant.
-  tresoProjection: { label: string; low: number; high: number }[];
   // Évolution du MRR mensuel (abonnements facturés) + courbe N-1 — réutilise TresoAreaChart.
   mrrSeries: SeriePoint[];
   mrrSeriesPrev: SeriePoint[];
@@ -219,25 +217,11 @@ export function Cockpit({
           </div>
         </div>
 
-        {/* Évolution de la trésorerie (+ fourchette de projection du solde fiat EUR sur l'exercice en cours) */}
+        {/* Évolution de la trésorerie — exercice + N-1 (solde fiat EUR fin de mois) */}
         <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
-            {data.tresoProjection.length > 0 && (
-              <InfoTip label="Détail : projection de trésorerie">
-                <span className="block">Fourchette de projection (exercice en cours, à rythme constant), à partir du dernier solde fiat EUR réel.</span>
-                <span className="mt-1 block">Cash futur = <strong className="font-semibold text-ink">CA HT projeté × taux de marge nette de l&apos;exercice</strong>.</span>
-                <span className="mt-1 block"><strong className="font-semibold text-ink">Quasi certaine</strong> (borne basse) = solde + (MRR × tauxNet) × mois restants.</span>
-                <span className="mt-1 block"><strong className="font-semibold text-ink">Potentielle</strong> (borne haute) = solde + (run-rate CA HT 6 mois × tauxNet) × mois restants.</span>
-                <span className="mt-1 block text-ink-3">CA en HT, sans correction du décalage HT/TTC ni du reliquat du mois en cours → projection conservatrice.</span>
-              </InfoTip>
-            )}
-          </div>
-          <p className="text-xs text-ink-3">Solde fiat EUR fin de mois · exercice {data.fy}{data.tresoProjection.length > 0 ? " · projeté à fin sept. (fourchette)" : ""}</p>
-          {data.tresoProjection.length > 0 && f.tauxNette != null && f.tauxNette <= 0 && (
-            <p className="mt-0.5 text-[11px] italic text-ink-3">Taux de marge nette négatif → projection en baisse.</p>
-          )}
-          <TresoAreaChart series={data.tresoSeries} compare={data.tresoSeriesPrev} projection={data.tresoProjection} />
+          <h2 className="text-sm font-semibold text-ink">Évolution de la trésorerie</h2>
+          <p className="text-xs text-ink-3">Solde fiat EUR fin de mois · exercice {data.fy}</p>
+          <TresoAreaChart series={data.tresoSeries} compare={data.tresoSeriesPrev} />
         </div>
 
         {/* CA HT mensuel — exercice vs N-1 */}

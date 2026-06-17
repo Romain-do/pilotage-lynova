@@ -8,7 +8,6 @@ import {
   computeMRR,
   mrrByMonth,
   monthCa,
-  monthLabelShort,
   fyOf,
   fyRange,
   fyLabel,
@@ -164,24 +163,6 @@ async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
         }
       : null;
 
-  // Prolongement de la courbe trésorerie en FOURCHETTE : le cash futur = CA HT projeté × taux de marge
-  // nette de l'exercice (`tauxNetRatio` = margeNette / CA HT). À partir du dernier solde réel, un point
-  // par mois fiscal restant (jusqu'à sept.) :
-  //   • quasi certaine (borne basse) = solde + (MRR × tauxNet) × k ;
-  //   • potentielle    (borne haute) = solde + (runRate CA × tauxNet) × k.
-  // Garde-fou : pas de données bancaires (hasBank faux) → pas de projection. Si tauxNet ≤ 0, on projette
-  // quand même (courbe descendante honnête) — signalé dans la note. Bornage low=min / high=max.
-  const tauxNetRatio = hasBank && cur.caHtTotal > 0 ? margeNette / cur.caHtTotal : null;
-  const lastBal = tresoSeries.length ? tresoSeries[tresoSeries.length - 1].endBalance : 0;
-  const tresoProjection =
-    caBasis && hasBank && tauxNetRatio != null && caBasis.monthsUsed >= 1 && caBasis.futureMonths.length > 0
-      ? caBasis.futureMonths.map((mk, j) => {
-          const k = j + 1;
-          const quasiVal = lastBal + mrr.mrr * tauxNetRatio * k; // CA récurrent (MRR) × marge nette
-          const potentielVal = lastBal + caBasis.runRate * tauxNetRatio * k; // CA run-rate × marge nette
-          return { label: monthLabelShort(mk), low: Math.min(quasiVal, potentielVal), high: Math.max(quasiVal, potentielVal) };
-        })
-      : [];
   // CA vs charges — mensuel HT (exercice en cours). Mêmes charges que la marge nette ⇒ cohérence.
   const chargeComps = chargeComponentsByMonth(treso.outflows, cur.months, range);
   // Reversements hors exploitation (TVA, IS) par mois — segments visuels du graphe, hors marge.
@@ -266,7 +247,6 @@ async function buildCockpitData(requestedFy?: number): Promise<CockpitData> {
     caFyPrev,
     tresoSeries,
     tresoSeriesPrev,
-    tresoProjection,
     mrrSeries,
     mrrSeriesPrev,
     caProjection,
