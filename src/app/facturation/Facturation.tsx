@@ -148,7 +148,7 @@ export function Facturation({
   );
 
   return (
-    <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-5 sm:px-6">
       {/* ───────── Barre d'outils ───────── */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -207,7 +207,7 @@ export function Facturation({
       <div className="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <div className="rounded-card border border-line bg-white p-4 shadow-card">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2">
               <h2 className="text-sm font-semibold text-ink">CA vs charges — mensuel HT</h2>
               <ChargesLegend />
             </div>
@@ -232,7 +232,7 @@ export function Facturation({
           </div>
 
           <div className="rounded-card border border-line bg-white p-4 shadow-card">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-sm font-semibold text-ink">CA HT mensuel — exercice {fyNow} vs {fyNow - 1}</h2>
               <div className="flex items-center gap-3 text-xs text-ink-2">
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>

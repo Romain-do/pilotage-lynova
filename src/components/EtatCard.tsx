@@ -39,7 +39,7 @@ export function EtatCard({
         <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px] bg-etat-badge text-etat-accent">
           <IconBuildingBank size={16} stroke={2} />
         </span>
-        <span className="min-w-0 truncate text-[11px] font-medium uppercase tracking-wide text-etat-accent">
+        <span className="min-w-0 text-[11px] font-medium uppercase leading-tight tracking-wide text-etat-accent line-clamp-2">
           Versé à l&apos;État
         </span>
         <span className="flex-none text-etat-accent">
@@ -50,7 +50,7 @@ export function EtatCard({
         </span>
       </div>
 
-      <div className={`mt-2.5 text-2xl font-semibold leading-none ${muted ? "text-ink-3" : "text-etat-ink"}`}>
+      <div className={`mt-2.5 text-xl font-semibold leading-none sm:text-2xl ${muted ? "text-ink-3" : "text-etat-ink"}`}>
         {muted ? "n/a" : euro(total)}
       </div>
 

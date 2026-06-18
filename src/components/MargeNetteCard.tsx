@@ -49,7 +49,7 @@ export function MargeNetteCard({
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-violet-50 text-violet-600">
           <IconReportMoney size={18} stroke={2} />
         </span>
-        <span className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-ink-3">Marge nette (approchée)</span>
+        <span className="min-w-0 text-xs font-medium uppercase leading-tight tracking-wide text-ink-3 line-clamp-2">Marge nette (approchée)</span>
         <span className="flex-none">
           <InfoTip label="Détail : Marge nette (approchée)">
             <span className="block">Marge nette ≈ CA HT − charges d&apos;exploitation : dépenses Revolut en TTC (décaissements réellement sortis), hors TVA &amp; IS, URSSAF incluse.</span>
@@ -60,7 +60,7 @@ export function MargeNetteCard({
       </div>
       {hasBank ? (
         <>
-          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink">{euro(value)}</div>
+          <div className="mt-2.5 text-xl font-semibold leading-none text-ink sm:text-2xl">{euro(value)}</div>
           <div className="mt-1.5 min-h-4 space-y-1 text-xs">
             {delta == null ? (
               <span className="text-ink-3">Vs N-1 : —</span>
@@ -137,7 +137,7 @@ export function MargeNetteCard({
         </>
       ) : (
         <>
-          <div className="mt-2.5 text-2xl font-semibold leading-none text-ink-3">n/a</div>
+          <div className="mt-2.5 text-xl font-semibold leading-none text-ink-3 sm:text-2xl">n/a</div>
           <p className="mt-1.5 min-h-4 text-xs leading-tight text-ink-3">pas de données bancaires avant nov. 2024</p>
         </>
       )}

@@ -23,7 +23,7 @@ export function CaProjectionCard({ fy, projection, className = "" }: { fy: numbe
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-cyan/15 text-cyan-600">
           <IconTrendingUp size={18} stroke={2} />
         </span>
-        <h2 className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-ink-3">CA HT projeté · ex. {fy}</h2>
+        <h2 className="min-w-0 text-xs font-semibold uppercase leading-tight tracking-wide text-ink-3 line-clamp-2">CA HT projeté · ex. {fy}</h2>
         <span className="flex-none">
           <InfoTip label="Détail : CA HT projeté">
             <span className="block">Projection à rythme constant, exercice en cours uniquement.</span>
@@ -57,13 +57,13 @@ function Body({ p }: { p: CaProjection }) {
 
       {/* Format étroit : les deux scénarios EMPILÉS (label gauche, valeur droite). */}
       <div className="mt-2.5 space-y-1.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-ink-3">Quasi certain</span>
-          <span className="tabular-nums text-base font-semibold leading-none text-ink">{euro(p.quasiCertain)}</span>
+        <div className="flex items-baseline justify-between gap-1.5">
+          <span className="min-w-0 text-[11px] font-medium uppercase leading-tight tracking-wide text-ink-3">Quasi certain</span>
+          <span className="flex-none tabular-nums text-sm font-semibold leading-none text-ink sm:text-base">{euro(p.quasiCertain)}</span>
         </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-ink-3">Potentiel</span>
-          <span className="tabular-nums text-base font-semibold leading-none text-cyan-600">{euro(p.potentiel)}</span>
+        <div className="flex items-baseline justify-between gap-1.5">
+          <span className="min-w-0 text-[11px] font-medium uppercase leading-tight tracking-wide text-ink-3">Potentiel</span>
+          <span className="flex-none tabular-nums text-sm font-semibold leading-none text-cyan-600 sm:text-base">{euro(p.potentiel)}</span>
         </div>
       </div>
 

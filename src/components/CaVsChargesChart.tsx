@@ -117,10 +117,10 @@ export function CaVsChargesChart({ data, bankStart }: { data: ChargeSeries; bank
             onClick={() => setOpenMonth(i)}
             aria-label={ariaFor(i)}
             aria-haspopup="dialog"
-            className="relative flex h-full flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+            className="relative flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
           >
             <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${hover === i ? "bg-cyan/[0.07]" : ""}`} />
-            <div className="relative flex h-full w-full items-end justify-center gap-1 pb-5">
+            <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-5 sm:gap-1">
               <StackedBar
                 segments={[
                   { value: abo[i], color: "bg-cyan" },
@@ -206,7 +206,7 @@ function StackedBar({
   const h = Math.min(100, (total / max) * 100);
   return (
     <div
-      className={`flex w-4 origin-bottom flex-col justify-end overflow-hidden rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${dim ? "opacity-40" : "opacity-100"}`}
+      className={`flex w-2.5 origin-bottom flex-col justify-end overflow-hidden rounded-t-sm transition-opacity duration-200 motion-safe:animate-[grow-up_0.5s_ease-out_both] sm:w-6 ${dim ? "opacity-40" : "opacity-100"}`}
       style={{ height: `${h}%`, animationDelay: `${idx * 20}ms` }}
     >
       {/* Rendu du haut vers le bas → on parcourt les segments en sens inverse. */}

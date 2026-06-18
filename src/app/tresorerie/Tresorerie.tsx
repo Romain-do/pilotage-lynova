@@ -99,7 +99,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
   const p = data.cryptoPnl;
 
   return (
-    <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-5 sm:px-6">
       {/* Barre d'outils */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -202,7 +202,7 @@ export function Tresorerie({ data, todayISO, freshness }: { data: Data; todayISO
 
       {/* Évolution rémunération — exercice vs N-1 */}
       <div className="mt-4 rounded-card border border-line bg-white p-4 shadow-card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold text-ink">Évolution rémunération — exercice {fyNow} vs {fyNow - 1}</h2>
           <div className="flex items-center gap-3 text-xs text-ink-2">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-cyan" /> Exercice {fyNow}</span>
