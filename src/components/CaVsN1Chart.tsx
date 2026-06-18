@@ -42,16 +42,16 @@ export function CaVsN1Chart({
               {...handlers(i)}
               aria-label={`${label} : exercice ${fy} ${euro(at(current, i))}, exercice ${fy - 1} ${euro(at(previous, i))}.`}
               aria-pressed={pinned === i}
-              className="relative flex h-full flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+              className="relative flex h-full min-w-0 flex-1 cursor-pointer flex-col items-center justify-end rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
             >
               <div className={`absolute inset-x-0 bottom-5 top-0 rounded-md transition-colors ${sel === i ? "bg-cyan/[0.07]" : ""}`} />
-              <div className="relative flex h-full w-full items-end justify-center gap-1 pb-5">
+              <div className="relative flex h-full w-full items-end justify-center gap-0.5 pb-5 sm:gap-1">
                 <div
-                  className={`w-4 origin-bottom rounded-t-sm bg-cyan transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
+                  className={`w-2.5 origin-bottom rounded-t-sm bg-cyan transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
                   style={{ height: `${Math.min(100, (at(current, i) / max) * 100)}%` }}
                 />
                 <div
-                  className={`w-4 origin-bottom rounded-t-sm bg-n1 transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
+                  className={`w-2.5 origin-bottom rounded-t-sm bg-n1 transition-opacity duration-200 sm:w-6 ${active ? "opacity-100" : "opacity-40"}`}
                   style={{ height: `${Math.min(100, (at(previous, i) / max) * 100)}%` }}
                 />
               </div>

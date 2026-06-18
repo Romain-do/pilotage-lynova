@@ -32,7 +32,7 @@ export function MrrCard({
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-sky-50 text-sky-600">
           <IconRepeat size={18} stroke={2} />
         </span>
-        <span className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-ink-3">MRR · {monthLabel ?? "—"}</span>
+        <span className="min-w-0 text-xs font-medium uppercase leading-tight tracking-wide text-ink-3 line-clamp-2">MRR · {monthLabel ?? "—"}</span>
         <span className="flex-none">
           <InfoTip label="Détail : MRR">
             <span className="block">Revenu mensuel récurrent : montant HT des abonnements facturés sur le mois, comparé au même mois N-1.</span>
@@ -42,7 +42,7 @@ export function MrrCard({
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-2xl font-semibold leading-none text-ink">{euro(mrr)}</span>
+        <span className="text-xl font-semibold leading-none text-ink sm:text-2xl">{euro(mrr)}</span>
         <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
           <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-semibold ${badgeClass}`}>
             <Arrow size={12} stroke={2.5} />

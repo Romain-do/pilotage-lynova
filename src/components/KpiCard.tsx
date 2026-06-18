@@ -66,11 +66,11 @@ export function KpiCard({
     <div className={`group rounded-card border border-line bg-white shadow-card transition-all duration-200 motion-safe:hover:-translate-y-px hover:shadow-card-hover ${compact ? "p-3" : "p-3.5"}`}>
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-[10px] ${tint}`}>{icon}</span>
-        <span className="min-w-0 truncate text-xs font-medium uppercase tracking-wide text-ink-3">{label}</span>
+        <span className="min-w-0 text-xs font-medium uppercase leading-tight tracking-wide text-ink-3 line-clamp-2">{label}</span>
         {badge && <span className="flex-none rounded-full bg-cloud px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-3">{badge}</span>}
         {info && <span className="flex-none"><InfoTip label={`Détail : ${label}`}>{info}</InfoTip></span>}
       </div>
-      <div className={`font-semibold leading-none ${compact ? "mt-2 text-xl" : "mt-2.5 text-2xl"} ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
+      <div className={`font-semibold leading-none ${compact ? "mt-2 text-lg sm:text-xl" : "mt-2.5 text-xl sm:text-2xl"} ${muted ? "text-ink-3" : "text-ink"}`}>{value}</div>
       <div className={`min-h-4 ${compact ? "mt-1 space-y-0.5" : "mt-1.5 space-y-1"}`}>
         {/* 1 — ligne évolution (badge % + delta €), ou mode `delta` historique, ou placeholder */}
         {hasN1 ? (

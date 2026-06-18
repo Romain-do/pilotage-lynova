@@ -19,8 +19,8 @@ export function LeayaCard({ ttc, ttcPrev }: { ttc: number; ttcPrev: number }) {
           </InfoTip>
         </span>
       </div>
-      <div className="mt-2.5 flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold leading-none text-leaya-ink">{euro(ttc)}</span>
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-1.5">
+        <span className="text-xl font-semibold leading-none text-leaya-ink sm:text-2xl">{euro(ttc)}</span>
         <span className="text-[10px] font-medium uppercase tracking-wide text-leaya-gold">TTC</span>
       </div>
       <div className="mt-1.5 space-y-1 text-xs">
