@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type {
   ProspectDTO,
   StageDTO,
@@ -17,6 +17,7 @@ import {
   deleteGroup,
   assignGroup,
   deleteProspect,
+  createProspect,
 } from "./actions";
 import { RefreshButton } from "@/components/RefreshButton";
 import { ProspectDrawer } from "./ProspectDrawer";
@@ -178,7 +179,8 @@ export function Prospection({
             <h1 className="text-xl font-semibold text-navy sm:text-2xl">{pipelineName}</h1>
             <p className="text-sm text-navy/55">{allProspects.length} prospect(s)</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <NewProspectButton defaultStageId={stages[0]?.id ?? null} onAdd={handleAdd} />
             {currentUser.role === "DIRIGEANT" && (
               <RefreshButton initialLastSync={lastSync} />
             )}
@@ -261,6 +263,120 @@ export function Prospection({
         />
       )}
     </>
+  );
+}
+
+/**
+ * Création rapide d'un prospect depuis l'en-tête (accessible aux 3 vues). Réutilise l'action
+ * `createProspect` (même logique que la vue Pipeline) en le plaçant dans la première étape du
+ * pipeline (l'étape par défaut, ex. « À rencontrer »). `onAdd` (= handleAdd) injecte le prospect
+ * dans l'état pour qu'il apparaisse immédiatement dans la vue courante.
+ */
+function NewProspectButton({
+  defaultStageId,
+  onAdd,
+}: {
+  defaultStageId: string | null;
+  onAdd: (dto: ProspectDTO) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  function close() {
+    setOpen(false);
+    setValue("");
+    setError(null);
+  }
+
+  function submit() {
+    const company = value.trim();
+    if (!company) return;
+    if (!defaultStageId) {
+      setError("Aucune étape de pipeline disponible.");
+      return;
+    }
+    const fd = new FormData();
+    fd.set("stageId", defaultStageId);
+    fd.set("company", company);
+    setError(null);
+    start(async () => {
+      try {
+        const dto = await createProspect(fd);
+        if (dto) {
+          onAdd(dto);
+          close();
+        } else {
+          setError("Création impossible. Réessayez.");
+        }
+      } catch {
+        setError("Une erreur est survenue. Réessayez.");
+      }
+    });
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => (open ? close() : setOpen(true))}
+        disabled={!defaultStageId}
+        aria-expanded={open}
+        className="rounded-lg bg-navy px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-navy-700 disabled:opacity-60"
+      >
+        + Nouveau prospect
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-20 mt-2 w-72 rounded-xl border border-navy/10 bg-white p-3 shadow-lg">
+          <label className="mb-1.5 block text-xs font-medium text-navy/60">Nouveau prospect</label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submit();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                close();
+              }
+            }}
+            placeholder="Société…"
+            disabled={pending}
+            className="w-full rounded-lg border border-navy/15 bg-white px-2.5 py-2 text-sm text-navy placeholder:text-navy/40 focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
+          />
+          {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={pending || !value.trim()}
+              className="rounded-md bg-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-navy-700 disabled:opacity-60"
+            >
+              {pending ? "…" : "Ajouter"}
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              disabled={pending}
+              className="text-sm text-navy/50 hover:text-navy disabled:opacity-60"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
