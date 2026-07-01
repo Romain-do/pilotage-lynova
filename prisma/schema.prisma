@@ -171,6 +171,54 @@ model RevolutLeg {
   @@map("revolut_leg")
 }
 
+// ───────────────────────── Épargne perso (Revolut personnel, import CSV) ─────────────────────────
+// Suivi privé des comptes Revolut PERSONNELS (compte courant joint + compte épargne), alimenté
+// par import manuel d'exports CSV Revolut (aucun appel API — comptes perso hors périmètre Business).
+// Accès réservé à une liste blanche d'e-mails (cf. EPARGNE_WHITELIST dans src/lib/auth.ts), vérifié
+// CÔTÉ SERVEUR. RLS deny-by-default comme toutes les tables (cf. 20260610153359_enable_rls).
+
+/// Compte perso, dérivé de la colonne « Produit » du CSV Revolut.
+/// COURANT = « Valeur actuelle » (compte courant joint) ; EPARGNE = « Dépôt » (compte épargne).
+enum PersoAccount {
+  COURANT
+  EPARGNE
+}
+
+/// Une ligne de transaction perso importée d'un export CSV Revolut.
+/// `dedupeHash` (hash de startedAt+amount+description+balance) porte une contrainte UNIQUE :
+/// un réimport du même export ne recrée pas de doublons (insert « skipDuplicates »).
+model PersoTransaction {
+  id          String       @id @default(uuid()) @db.Uuid
+  account     PersoAccount // dérivé de « Produit »
+  type        String // « Type » (Paiement par carte, Virement, Intérêts…)
+  description String // « Description », entités HTML décodées (&#39; → ')
+  amount      Decimal      @db.Decimal(14, 2) // « Montant » (signé)
+  fee         Decimal      @default(0) @db.Decimal(14, 2) // « Frais »
+  currency    String // « Devise » (EUR attendu)
+  startedAt   DateTime // « Date de début »
+  completedAt DateTime? // « Date de fin » (peut être absente)
+  balance     Decimal      @db.Decimal(14, 2) // « Solde » après opération
+  state       String // « État » (TERMINÉ… ; RENVOYÉ est exclu à l'import)
+  category    String? // catégorie de dépense (renseignée au Lot 2)
+  excluded    Boolean      @default(false) // exclu du budget (avance remboursée) — hors total/catégories
+  dedupeHash  String       @unique
+  createdAt   DateTime     @default(now())
+
+  @@index([account, startedAt])
+  @@map("perso_transaction")
+}
+
+/// Corrections mémorisées marchand → catégorie (apprentissage manuel, exploité au Lot 2).
+model MerchantCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  merchantKey String   @unique // clé normalisée du marchand (ex. description nettoyée en minuscules)
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("merchant_category")
+}
+
 /// État de synchronisation d'une source externe (Evoliz, Revolut…).
 model SyncState {
   source     String    @id // "evoliz", "revolut"…

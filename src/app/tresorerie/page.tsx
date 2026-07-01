@@ -2,7 +2,7 @@ import { requireDirigeant } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTresorerie } from "@/lib/tresorerie-data";
 import { lastSyncAll, sourceFreshness } from "@/lib/sync-state";
-import { AppNav } from "@/components/AppNav";
+import { AppNavServer } from "@/components/AppNavServer";
 import { Tresorerie } from "./Tresorerie";
 
 // Vue Trésorerie (§5.4-5.7) — DIRIGEANT seul, lecture seule (cache Revolut).
@@ -18,7 +18,7 @@ export default async function TresoreriePage() {
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      <AppNav role="DIRIGEANT" />
+      <AppNavServer />
 
       {data.accounts.length === 0 ? (
         <section className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-6 py-16 text-center">

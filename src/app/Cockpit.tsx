@@ -100,10 +100,12 @@ const ALERT_TONE: Record<string, string> = {
 
 export function Cockpit({
   user,
+  epargne,
   dateLabel,
   data,
 }: {
   user: { name: string | null; email: string; role: string };
+  epargne: boolean;
   dateLabel: string;
   data: CockpitData;
 }) {
@@ -113,7 +115,7 @@ export function Cockpit({
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      <AppNav role={user.role} />
+      <AppNav role={user.role} epargne={epargne} />
 
       <section className="mx-auto w-full max-w-7xl flex-1 overflow-x-hidden px-4 py-6 sm:px-6">
         {/* Salutation + actions prioritaires compactes + actualiser */}

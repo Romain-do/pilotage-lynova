@@ -136,7 +136,7 @@ export function LoginForm({ notice }: { notice?: string }) {
           required
           autoComplete="email"
           defaultValue={email}
-          placeholder="vous@lynova.net"
+          placeholder="Votre email"
           disabled={reqPending}
           className={`${inputCls} mt-1`}
         />

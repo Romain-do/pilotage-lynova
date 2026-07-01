@@ -7,6 +7,7 @@ import {
   IconCoin,
   IconWallet,
   IconUsers,
+  IconPigMoney,
 } from "@tabler/icons-react";
 import { Logo } from "./Logo";
 
@@ -27,10 +28,14 @@ function activeClass(brand: Brand): string {
 
 // Header de navigation persistant (toutes les vues). Le DIRIGEANT voit les 4 liens ;
 // le COMMERCIAL ne voit que Prospection (RBAC inchangé, garde serveur par ailleurs).
-export function AppNav({ role }: { role: string }) {
+// `epargne` (liste blanche, décidée CÔTÉ SERVEUR) ajoute le lien « Notre épargne ».
+export function AppNav({ role, epargne = false }: { role: string; epargne?: boolean }) {
   const pathname = usePathname();
   const isDirigeant = role === "DIRIGEANT";
-  const links = isDirigeant ? LINKS : LINKS.filter((l) => l.href === "/prospection");
+  const base = isDirigeant ? LINKS : LINKS.filter((l) => l.href === "/prospection");
+  const links = epargne
+    ? [...base, { href: "/epargne", label: "Notre épargne", Icon: IconPigMoney, brand: "lynova" as Brand }]
+    : base;
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const home = isDirigeant ? "/" : "/prospection";
 

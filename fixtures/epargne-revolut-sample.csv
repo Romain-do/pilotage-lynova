@@ -1,0 +1,8 @@
+Type,Produit,Date de début,Date de fin,Description,Montant,Frais,Devise,État,Solde
+Paiement par carte,Valeur actuelle,2025-06-05 10:12:00,2025-06-05 10:12:01,Bricomarché,-40.24,0.00,EUR,TERMINÉ,1234.56
+Intérêts,Dépôt,2025-11-03 03:32:11,2025-11-03 03:32:11,"Intérêts nets versés pour Compte d&#39;épargne le Nov 3, 2025",0.35,0.09,EUR,TERMINÉ,12974.24
+Virement,Dépôt,2025-11-02 12:58:35,2025-11-02 12:58:36,À EUR Compte d'épargne,12000.00,0.00,EUR,TERMINÉ,12000.00
+Paiement par carte,Valeur actuelle,2025-06-06 09:00:00,2025-06-06 09:00:01,"Café, croissant & jus d&#39;orange",-8.90,0.00,EUR,TERMINÉ,1225.66
+Remboursement,Valeur actuelle,2025-06-07 14:20:00,2025-06-07 14:20:01,Achat annulé,40.24,0.00,EUR,RENVOYÉ,1265.90
+Paiement par carte,Valeur actuelle,2025-06-05 10:12:00,2025-06-05 10:12:01,Bricomarché,-40.24,0.00,EUR,TERMINÉ,1234.56
+Paiement par carte,Valeur actuelle,2025-07-01 18:45:00,2025-07-01 18:45:02,Airbnb London,-120.00,1.20,GBP,TERMINÉ,980.10

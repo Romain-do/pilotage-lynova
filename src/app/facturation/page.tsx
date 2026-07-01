@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getTresorerie } from "@/lib/tresorerie-data";
 import { getEvolizInvoices, getEvolizBuys } from "@/lib/facturation-data";
 import { lastSyncAll, sourceFreshness } from "@/lib/sync-state";
-import { AppNav } from "@/components/AppNav";
+import { AppNavServer } from "@/components/AppNavServer";
 import { Facturation } from "./Facturation";
 
 // Vue Facturation (§5) — réservée au DIRIGEANT (donnée financière, §3).
@@ -31,7 +31,7 @@ export default async function FacturationPage() {
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      <AppNav role="DIRIGEANT" />
+      <AppNavServer />
 
       {factDocs.length === 0 ? (
         <section className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-6 py-16 text-center">
