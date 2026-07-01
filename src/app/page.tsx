@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
-import { requireUser } from "@/lib/auth";
+import { requireUser, isEpargneEmail } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { prisma } from "@/lib/prisma";
 import {
@@ -69,7 +69,14 @@ export default async function Home({
     year: "numeric",
   });
 
-  return <Cockpit user={{ name: user.name, email: user.email, role: user.role }} dateLabel={dateLabel} data={data} />;
+  return (
+    <Cockpit
+      user={{ name: user.name, email: user.email, role: user.role }}
+      epargne={isEpargneEmail(user.email)}
+      dateLabel={dateLabel}
+      data={data}
+    />
+  );
 }
 
 const HIDDEN_CATS = new Set<KpiCategory>(["a_installer", "installes", "refus"]);

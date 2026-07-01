@@ -63,3 +63,25 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 export async function requireDirigeant(): Promise<SessionUser> {
   return requireRole("DIRIGEANT");
 }
+
+/**
+ * Liste blanche d'accès à l'espace « Notre épargne » (comptes Revolut PERSO).
+ * Indépendante des rôles applicatifs : seuls ces e-mails y accèdent, quel que soit leur rôle.
+ * Comparaison insensible à la casse (cf. isEpargneEmail).
+ */
+export const EPARGNE_WHITELIST = ["romain@lynova.net", "meganne@leaya.fr"] as const;
+
+/** True si l'e-mail figure dans la liste blanche « Notre épargne ». */
+export function isEpargneEmail(email: string | null | undefined): boolean {
+  return !!email && (EPARGNE_WHITELIST as readonly string[]).includes(email.trim().toLowerCase());
+}
+
+/**
+ * Garde de l'espace « Notre épargne » : exige une session dont l'e-mail est en liste blanche.
+ * Redirige (page) toute autre personne — le masquage UI ne suffit jamais (§3).
+ */
+export async function requireEpargneAccess(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!isEpargneEmail(user.email)) redirect("/");
+  return user;
+}

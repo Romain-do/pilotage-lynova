@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { lastSyncAll } from "@/lib/sync-state";
 import { getProspectionBoard } from "@/lib/prospection-data";
-import { AppNav } from "@/components/AppNav";
+import { AppNavServer } from "@/components/AppNavServer";
 import { Prospection } from "./Prospection";
 import { createStarterPipeline } from "./actions";
 
@@ -23,7 +23,7 @@ export default async function ProspectionPage({
 
   return (
     <main className="flex flex-1 flex-col bg-cloud">
-      <AppNav role={me.role} />
+      <AppNavServer />
 
       {!board.pipeline ? (
         <EmptyState />
