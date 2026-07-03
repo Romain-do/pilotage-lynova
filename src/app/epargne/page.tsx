@@ -2,7 +2,7 @@ import { IconArrowUpRight, IconArrowDownRight } from "@tabler/icons-react";
 import { requireEpargneAccess } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppNavServer } from "@/components/AppNavServer";
-import { getPeriodReport, getSavingsEvolution, getCourantEvolution, getRollingCategoryReport } from "@/lib/epargne/report";
+import { getPeriodReport, getSavingsEvolution, getRollingCategoryReport } from "@/lib/epargne/report";
 import { TresoAreaChart } from "@/components/TresoAreaChart";
 import { EpargneUpload } from "./EpargneUpload";
 import { EpargneReport } from "./EpargneReport";
@@ -26,10 +26,10 @@ export default async function EpargnePage({
 
   const sp = await searchParams;
 
-  const [counts, savings, courant, rolling, report] = await Promise.all([
+  const [counts, savings, courantLast, rolling, report] = await Promise.all([
     prisma.persoTransaction.groupBy({ by: ["account"], _count: { _all: true } }),
     getSavingsEvolution(),
-    getCourantEvolution(),
+    prisma.persoTransaction.findFirst({ where: { account: "COURANT" }, orderBy: { startedAt: "desc" }, select: { balance: true } }),
     getRollingCategoryReport(),
     getPeriodReport(sp),
   ]);
@@ -60,7 +60,7 @@ export default async function EpargnePage({
           <div className="rounded-card border border-line bg-white p-4 shadow-card">
             <div className="text-xs font-medium uppercase tracking-wide text-ink-3">Compte courant joint</div>
             <div className="mt-1 text-2xl font-semibold text-ink">
-              {courant ? eur2.format(courant.currentBalance) : "—"}
+              {courantLast ? eur2.format(Number(courantLast.balance)) : "—"}
             </div>
             <div className="mt-1 text-xs text-ink-3">{countByAccount.get("COURANT") ?? 0} transaction(s)</div>
           </div>
@@ -102,30 +102,18 @@ export default async function EpargnePage({
           </section>
         )}
 
-        {/* Solde du compte courant — 12 derniers mois (courbe épurée) */}
-        {courant && courant.series.length > 0 && (
-          <section className="mb-4 rounded-card border border-line bg-white p-4 shadow-card">
-            <ChartHeader
-              title="Solde du compte courant"
-              subtitle="Fin de mois · 12 derniers mois"
-              stats={[{ label: "Solde actuel", value: eur0.format(courant.currentBalance), tone: "ink" }]}
-            />
-            <TresoAreaChart series={courant.series} title="Solde du compte courant" valueLabel="Solde" />
-          </section>
+        {/* Détail des dépenses par période (mois / année / personnalisé) */}
+        {report && (
+          <div className="mb-8">
+            <h2 className="mb-3 text-lg font-semibold text-ink">Détail des dépenses</h2>
+            <EpargneReport report={report} />
+          </div>
         )}
 
         {/* Top 10 dépenses par catégorie — 12 derniers mois */}
         {rolling && (
           <div className="mb-8">
             <EpargneTop10 report={rolling} />
-          </div>
-        )}
-
-        {/* Détail des dépenses par période (mois / année / personnalisé) */}
-        {report && (
-          <div className="mb-8">
-            <h2 className="mb-3 text-lg font-semibold text-ink">Détail des dépenses</h2>
-            <EpargneReport report={report} />
           </div>
         )}
 

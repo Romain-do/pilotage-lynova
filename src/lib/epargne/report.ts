@@ -140,11 +140,6 @@ export interface SavingsEvolution {
   yoyDelta: number | null; // variation % vs le même mois l'an dernier (null si pas de N-1)
 }
 
-export interface CourantEvolution {
-  series: SavingsPoint[]; // 12 derniers mois glissants (courbe épurée, sans N-1)
-  currentBalance: number;
-}
-
 const MAX_ITER = 600; // garde-fou d'itération (données perso → quelques années au plus)
 
 /**
@@ -220,14 +215,6 @@ export async function getSavingsEvolution(): Promise<SavingsEvolution | null> {
     prevYearLabel,
     yoyDelta,
   };
-}
-
-/** Solde du compte COURANT — 12 derniers mois glissants (courbe épurée, sans N-1). */
-export async function getCourantEvolution(): Promise<CourantEvolution | null> {
-  const data = await endOfMonthBalances("COURANT");
-  if (!data) return null;
-  const last12 = data.months.slice(-12);
-  return { series: last12.map((k) => point(k, data.balByMonth.get(k)!)), currentBalance: data.currentBalance };
 }
 
 /** Liste des mois civils entre le premier et le dernier mois ayant une transaction COURANT. */
